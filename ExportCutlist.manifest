@@ -1,0 +1,12 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "author": "Billy Keyes",
+  "description": {
+    "": "Export a cutlist file containing bodies of selected components"
+  },
+  "supportedOS": "windows|mac",
+  "editEnabled": true,
+  "version": "v0.0.0",
+  "runOnStartup": true
+}
