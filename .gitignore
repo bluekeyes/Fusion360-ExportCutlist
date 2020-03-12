@@ -1,0 +1,6 @@
+# compiled python files
+__pycache__/
+*.pyc
+
+# vscode project files
+.vscode/
