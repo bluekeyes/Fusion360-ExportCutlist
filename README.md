@@ -1,4 +1,4 @@
-<img src="./resources/icon.svg" height="64" align="left" />
+<img src="./resources/icon.svg" height="64" align="right" />
 
 # Fusion360 Export Cutlist 
 
