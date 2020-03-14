@@ -1,4 +1,6 @@
-# Fusion360 Export Cutlist
+<img src="./resources/icon.svg" height="64" align="left" />
+
+# Fusion360 Export Cutlist 
 
 An Autodesk Fusion360 addin that can export a cut list of parts in a variety
 of formats. It is meant to adapt to multiple workflows and does not require
