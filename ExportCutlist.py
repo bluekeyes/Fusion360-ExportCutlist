@@ -236,9 +236,9 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
         formatInput = inputs.addDropDownCommandInput('format', 'Output Format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         formatInput.tooltip = 'The output format of the cutlist.'
-        formatInput.listItems.add('JSON', True, '')
+        formatInput.listItems.add('Table', True, '')
+        formatInput.listItems.add('JSON', False, '')
         formatInput.listItems.add('CSV', False, '')
-        formatInput.listItems.add('Table', False, '')
 
         onExecute = CutlistCommandExecuteHandler()
         cmd.execute.add(onExecute)
