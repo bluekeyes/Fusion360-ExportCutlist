@@ -298,7 +298,8 @@ def run(context):
 
     cmdDef = ui.commandDefinitions.addButtonDefinition(
         COMMAND_ID, COMMAND_NAME,
-        'Export a cutlist file for the bodies in selected components')
+        'Export a cutlist file for the bodies in selected components',
+        './/resources')
 
     onCreate = CutlistCommandCreatedEventHandler()
     cmdDef.commandCreated.add(onCreate)
