@@ -117,6 +117,8 @@ class CutList:
         elif type(obj) is adsk.fusion.Component:
             for body in obj.bRepBodies:
                 self.addBody(body, self._joinname(name, obj.name, body.name))
+            for occ in obj.occurrences:
+                self.add(occ, self._joinname(name, obj.name))
 
         else:
             raise ValueError(f'Cannot add object with type: {obj.objectType}')
