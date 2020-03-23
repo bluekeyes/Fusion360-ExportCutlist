@@ -81,17 +81,18 @@ class CutListItem:
 
 
 class CutList:
-    def __init__(self, includehidden=False, ignorematerial=False, namesep='/'):
+    def __init__(self, ignorehidden=False, ignorematerial=False, ignoreexternal=False, namesep='/'):
         self.items = []
-        self.includehidden = includehidden
+        self.ignorehidden = ignorehidden
         self.ignorematerial = ignorematerial
+        self.ignoreexternal = ignoreexternal
         self.namesep = namesep
 
     def addBody(self, body, name):
-        if not body.isVisible and not self.includehidden:
+        if not body.isSolid:
             return
 
-        if not body.isSolid:
+        if not body.isVisible and self.ignorehidden:
             return
 
         added = False
@@ -109,6 +110,8 @@ class CutList:
             self.addBody(obj, self._joinname(name, obj.name))
 
         elif type(obj) is adsk.fusion.Occurrence:
+            if obj.isReferencedComponent and self.ignoreexternal:
+                return 
             for body in obj.bRepBodies:
                 self.addBody(body, self._joinname(name, obj.component.name, body.name))
             for child in obj.childOccurrences:
@@ -234,8 +237,11 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         selectInput.addSelectionFilter('Occurrences')
         selectInput.setSelectionLimits(0)
 
-        visibilityInput = inputs.addBoolValueInput('visibility', 'Include hidden bodies', True, '', False)
-        visibilityInput.tooltip = 'If checked, hidden bodies are included in the cutlist.'
+        hiddenInput = inputs.addBoolValueInput('hidden', 'Ignore hidden', True, '', True)
+        hiddenInput.tooltip = 'If checked, hidden bodies are excluded from the cutlist.'
+
+        externalInput = inputs.addBoolValueInput('external', 'Ignore external', True, '', False)
+        externalInput.tooltip = 'If checked, external components are excluded from the cutlist.'
 
         materialInput = inputs.addBoolValueInput('material', 'Ignore materials', True, '', False)
         materialInput.tooltip = 'If checked, bodies with different materials will match if they have the same dimensions'
@@ -264,12 +270,17 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         ui = app.userInterface
         design = adsk.fusion.Design.cast(app.activeProduct)
 
-        visibilityInput = inputs.itemById('visibility')
+        hiddenInput = inputs.itemById('hidden')
+        externalInput = inputs.itemById('external')
         materialInput = inputs.itemById('material')
         selectionInput = inputs.itemById('selection')
         formatInput = inputs.itemById('format')
 
-        cutlist = CutList(includehidden=visibilityInput.value, ignorematerial=materialInput.value)
+        cutlist = CutList(
+            ignorehidden=hiddenInput.value,
+            ignorematerial=materialInput.value,
+            ignoreexternal=externalInput.value,
+        )
         for i in range(selectionInput.selectionCount):
             cutlist.add(selectionInput.selection(i).entity)
 
