@@ -19,6 +19,7 @@ COMMAND_NAME = 'Export Cutlist'
 # required to keep handlers in scope
 handlers = []
 
+
 def report_errors(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -28,6 +29,7 @@ def report_errors(func):
             app = adsk.core.Application.get()
             app.userInterface.messageBox('Failed:\n{}'.format(traceback.format_exc()))
     return wrapper
+
 
 class Dimensions:
     epsilon = 0.0001
@@ -55,29 +57,25 @@ class Dimensions:
 
 
 class CutListItem:
-    def __init__(self, body, name, ignorematerial=False):
+    def __init__(self, body, name):
         self.names = [name]
         self.dimensions = Dimensions.from_body(body)
-
-        self.ignorematerial = ignorematerial
-        if ignorematerial:
-            self.material = None
-        else:
-            self.material = body.material.name
+        self.material = body.material.name
 
     @property
     def count(self):
         return len(self.names)
 
-    def add(self, body, name=None):
-        dimensions = Dimensions.from_body(body)
-        matches = self.dimensions == dimensions and (self.ignorematerial or self.material == body.material.name)
-
-        if matches:
-            self.names.append(name if name else body.name)
-            return True
+    def matches(self, other, ignorematerial=False):
+        if isinstance(other, CutListItem):
+            return self.dimensions == other.dimensions and (ignorematerial or self.material == other.material)
+        elif isinstance(other, adsk.fustion.BRepBody):
+            return self.dimensions == Dimensions.from_body(other) and (ignorematerial or self.material == other.material.name)
         else:
             return False
+
+    def add_instance(self, name):
+        self.names.append(name)
 
 
 class CutList:
@@ -88,45 +86,48 @@ class CutList:
         self.ignoreexternal = ignoreexternal
         self.namesep = namesep
 
-    def addBody(self, body, name):
+    def add_body(self, body, name):
         if not body.isSolid:
             return
 
         if not body.isVisible and self.ignorehidden:
             return
 
+        minimal_body = find_minimal_body(body)
+
         added = False
         for item in self.items:
-            if item.add(body, name):
+            if item.matches(minimal_body, ignorematerial=self.ignorematerial):
+                item.add_instance(name)
                 added = True
                 break
 
         if not added:
-            item = CutListItem(body, name, ignorematerial=self.ignorematerial)
+            item = CutListItem(minimal_body, name)
             self.items.append(item)
 
     def add(self, obj, name=None):
-        if type(obj) is adsk.fusion.BRepBody:
-            self.addBody(obj, self._joinname(name, obj.name))
+        if isinstance(obj, adsk.fusion.BRepBody):
+            self.add_body(obj, self._joinname(name, obj.name))
 
-        elif type(obj) is adsk.fusion.Occurrence:
+        elif isinstance(obj, adsk.fusion.Occurrence):
             if obj.isReferencedComponent and self.ignoreexternal:
                 return 
             for body in obj.bRepBodies:
-                self.addBody(body, self._joinname(name, obj.component.name, body.name))
+                self.add_body(body, self._joinname(name, obj.component.name, body.name))
             for child in obj.childOccurrences:
                 self.add(child, self._joinname(name, obj.component.name))
 
-        elif type(obj) is adsk.fusion.Component:
+        elif isinstance(obj, adsk.fusion.Component):
             for body in obj.bRepBodies:
-                self.addBody(body, self._joinname(name, obj.name, body.name))
+                self.add_body(body, self._joinname(name, obj.name, body.name))
             for occ in obj.occurrences:
                 self.add(occ, self._joinname(name, obj.name))
 
         else:
             raise ValueError(f'Cannot add object with type: {obj.objectType}')
 
-    def sortedItems(self):
+    def sorted_items(self):
         items = list(self.items)
         items.sort(key=lambda i: attrgetter('length', 'width', 'height')(i.dimensions), reverse=True)
         items.sort(key=attrgetter('count'), reverse=True)
@@ -135,6 +136,46 @@ class CutList:
 
     def _joinname(self, *parts):
         return self.namesep.join([p for p in parts if p])
+
+
+def find_minimal_body(body):
+    face = find_largest_planar_convex_face(body)
+    if face is None:
+        return body
+
+    # 2. Find longest edge of that face
+    # 3. Find transform to align edge with X axis (method depends on edge type)
+    # 4. Find transform to align normal vector with Z axis
+    # 5. Make temporary copy of body
+    # 6. Apply transform to temporary body
+    # 7. Return temporary body
+    return body
+
+
+# find_largest_convex_face returns the planar convex face with the largest area
+# in body or None if no planar convex faces exist. In the context of this
+# function, convex refers to how the face is connected to other faces in the 3D
+# body, not to the 2D shape of the face in isolation.
+def find_largest_planar_convex_face(body)
+    convex_edges = set(body.convexEdges)
+
+    largest_face = None
+
+    for f in body.faces:
+        if not is_planar_face(f, convex_edges):
+            continue
+        if largest_face and f.area > largest_face.area:
+            largest_face = f
+
+    return largest_face
+
+
+# is_planar_face returns true if face is a plane and all of its edges appear in
+# the set edges.
+def is_planar_face(face, edges):
+    if f.geometry.surfaceType != adsk.core.SurfaceTypes.PlaneSurfaceType:
+        return False
+    return set(f.edges) <= edges
 
 
 class Formatter:
@@ -169,7 +210,7 @@ class Formatter:
                 'names': item.names,
             }
 
-        return json.dumps([todict(item) for item in cutlist.sortedItems()], indent=2)
+        return json.dumps([todict(item) for item in cutlist.sorted_items()], indent=2)
 
     def _cutlistcsv(self, cutlist):
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
@@ -188,7 +229,7 @@ class Formatter:
         with io.StringIO(newline='') as f:
             w = csv.DictWriter(f, fieldnames=fieldnames)
             w.writeheader()
-            w.writerows([todict(item) for item in cutlist.sortedItems()])
+            w.writerows([todict(item) for item in cutlist.sorted_items()])
             return f.getvalue()
 
     def _cutlisttable(self, cutlist):
@@ -210,7 +251,7 @@ class Formatter:
         tt.header(fieldnames)
         tt.set_cols_dtype(['i', 't', 't', 't', 't', 't'])
         tt.set_cols_align(['r', 'l', 'r', 'r', 'r', 'l'])
-        tt.add_rows([torow(item) for item in cutlist.sortedItems()], header=False)
+        tt.add_rows([torow(item) for item in cutlist.sorted_items()], header=False)
         return tt.draw()
 
 
