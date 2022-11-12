@@ -4,6 +4,19 @@ import adsk.fusion
 from . import vectors
 
 
+class HashableEdge:
+    def __init__(self, edge: adsk.fusion.BRepEdge):
+        self.edge = edge
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, HashableEdge):
+            return self.edge.tempId == other.edge.tempId
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.edge.tempId)
+
+
 # Returns true if the edge has an orientation heuristic
 def is_orientable_edge(edge: adsk.fusion.BRepEdge) -> bool:
     return edge.geometry.curveType in _orientable_curve_types
@@ -23,7 +36,7 @@ def get_edge_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Vector3D:
     if not fn:
         raise ValueError(f"edge of type {edge.geometry.curveType} does not have an orientation heuristic")
 
-    return fn(edge.geometry)
+    return fn(edge)
 
 
 def _get_arc3d_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Vector3D:

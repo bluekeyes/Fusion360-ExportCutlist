@@ -3,7 +3,8 @@ from typing import AbstractSet, List
 import adsk.core
 import adsk.fusion
 
-from .edges import is_linear_edge, is_orientable_edge, get_edge_orientation
+from .edges import HashableEdge, is_linear_edge, is_orientable_edge, get_edge_orientation
+from .vectors import is_axis_aligned
 
 
 def get_minimal_body(body: adsk.fusion.BRepBody):
@@ -11,18 +12,21 @@ def get_minimal_body(body: adsk.fusion.BRepBody):
     if face is None:
         return body
 
+    (_, body_z) = face.evaluator.getNormalAtPoint(face.centroid)
+    if is_axis_aligned(body_z):
+        # face is already axis-aligned, skip transformations
+        return body
+
     origin = adsk.core.Point3D.create()
-    target_x = adsk.core.Vector3D(x=1)
-    target_y = adsk.core.Vector3D(y=1)
-    target_z = adsk.core.Vector3D(z=1)
+    target_x = adsk.core.Vector3D.create(x=1)
+    target_y = adsk.core.Vector3D.create(y=1)
+    target_z = adsk.core.Vector3D.create(z=1)
 
     edge = find_longest_orientable_edge(face)
     if edge:
         body_x = get_edge_orientation(edge)
     else:
         body_x = target_x
-
-    (_, body_z) = face.evaluator.getNormalAtPoint(face.centroid)
 
     body_y = body_x.crossProduct(body_z)
     body_y.normalize()
@@ -42,7 +46,7 @@ def get_minimal_body(body: adsk.fusion.BRepBody):
 # how the face is connected to other faces in the 3D body, not to the 2D shape
 # of the face in isolation.
 def find_largest_planar_convex_face(body: adsk.fusion.BRepBody) -> adsk.fusion.BRepFace:
-    convex_edges = set(body.convexEdges)
+    convex_edges = edgeset(body.convexEdges)
 
     largest_face = None
     for f in body.faces:
@@ -55,15 +59,20 @@ def find_largest_planar_convex_face(body: adsk.fusion.BRepBody) -> adsk.fusion.B
 
 
 # Returns true if face is a plane and all of its outer edges appear in the set edges.
-def is_planar_face(face: adsk.fusion.BRepFace, edges: AbstractSet[adsk.fusion.BRepEdge]) -> bool:
+def is_planar_face(face: adsk.fusion.BRepFace, edges: AbstractSet[HashableEdge]) -> bool:
     if face.geometry.surfaceType == adsk.core.SurfaceTypes.PlaneSurfaceType:
-        return set(get_outer_edges(face)) <= edges
+        outer_edges = edgeset(get_outer_edges(face))
+        return outer_edges <= edges
     return False
 
 
 # Returns the edges in all outer loops of the face
 def get_outer_edges(face: adsk.fusion.BRepFace) -> List[adsk.fusion.BRepEdge]:
     return [edge for loop in face.loops for edge in loop.edges if loop.isOuter]
+
+
+def edgeset(edges) -> AbstractSet[HashableEdge]:
+    return set(HashableEdge(edge) for edge in edges)
 
 
 # Return the longest member of edges that has an orientation heuristic

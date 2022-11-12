@@ -35,7 +35,7 @@ def report_errors(func):
 
 
 class Dimensions:
-    epsilon = 0.0001
+    epsilon = 1e-06
 
     @classmethod
     def from_body(cls, body):
@@ -72,7 +72,7 @@ class CutListItem:
     def matches(self, other, ignorematerial=False):
         if isinstance(other, CutListItem):
             return self.dimensions == other.dimensions and (ignorematerial or self.material == other.material)
-        elif isinstance(other, adsk.fustion.BRepBody):
+        elif isinstance(other, adsk.fusion.BRepBody):
             return self.dimensions == Dimensions.from_body(other) and (ignorematerial or self.material == other.material.name)
         else:
             return False
