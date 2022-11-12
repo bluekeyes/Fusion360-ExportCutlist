@@ -5,13 +5,16 @@ import csv
 import functools
 import io
 import json
+import traceback
 
-from collections import namedtuple
 from operator import attrgetter
 
-import adsk.core, adsk.fusion, traceback
+import adsk.core
+import adsk.fusion
 
 from .lib.texttable import Texttable
+from .lib.geometry.bodies import get_minimal_body
+
 
 COMMAND_ID = 'ExportCutlistCommand'
 COMMAND_NAME = 'Export Cutlist'
@@ -93,7 +96,7 @@ class CutList:
         if not body.isVisible and self.ignorehidden:
             return
 
-        minimal_body = find_minimal_body(body)
+        minimal_body = get_minimal_body(body)
 
         added = False
         for item in self.items:
@@ -136,63 +139,6 @@ class CutList:
 
     def _joinname(self, *parts):
         return self.namesep.join([p for p in parts if p])
-
-
-def find_minimal_body(body):
-    face = find_largest_planar_convex_face(body)
-    if face is None:
-        return body
-
-    edge = find_longest_orientable_edge(face.edges)
-    if edge:
-        # get orientation
-        pass
-    else:
-        # edge_transform = identity
-        pass
-
-    # 3. Find transform to align edge with X axis (method depends on edge type)
-    # 4. Find transform to align normal vector with Z axis
-    # 5. Make temporary copy of body
-    # 6. Apply transform to temporary body
-    # 7. Return temporary body
-    return body
-
-
-# find_largest_convex_face returns the planar convex face with the largest area
-# in body or None if no planar convex faces exist. In the context of this
-# function, convex refers to how the face is connected to other faces in the 3D
-# body, not to the 2D shape of the face in isolation.
-def find_largest_planar_convex_face(body):
-    convex_edges = set(body.convexEdges)
-
-    largest_face = None
-    for f in body.faces:
-        if not is_planar_face(f, convex_edges):
-            continue
-        if largest_face is None or f.area > largest_face.area:
-            largest_face = f
-    return largest_face
-
-
-# is_planar_face returns true if face is a plane and all of its edges appear in
-# the set edges.
-def is_planar_face(face, edges):
-    if f.geometry.surfaceType == adsk.core.SurfaceTypes.PlaneSurfaceType:
-        return set(f.edges) <= edges
-    return False
-
-
-# find_longest_orientable_edge returns the longest member of edges that has one
-# of the geometry types with a orientation heuristic.
-def find_longest_orientable_edge(edges):
-    longest_edge = None
-    for e in edges:
-        if not is_orientable_edge(e):
-            continue
-        if longest_edge is None or e.length > longest_edge.length:
-            longest_edge = e
-    return longest_edge
 
 
 class Formatter:
