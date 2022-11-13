@@ -3,18 +3,20 @@
 # Fusion360 Export Cutlist 
 
 An Autodesk Fusion360 addin that can export a cut list of parts in a variety
-of formats. It is meant to adapt to multiple workflows and does not require
-you to structure your design in a specific way.
+of formats. Useful for woodworking or other crafts that mostly cut shapes out of
+rectangular stock.
+
+It's compatible with many modeling styles and does not require a specific
+document structure or workflow.
 
 ## Features
 
 - Operates on bodies, selected either directly or by selecting components
-- Exports to JSON, CSV, or text table
-- Automatically groups parts by matching body bounding box dimensions and
-  materials
-  - The largest dimension is considered `length`, the next largest `width`,
-    and the smallest `height`
-  - Material matching can be disabled if desired
+- Groups parts by matching bounding box dimensions and materials
+  - The largest dimension is called `length`, the next largest `width`, and the smallest `height`
+  - Accounts for [part rotation](#matching-rotation) when matching bounding boxes
+  - Material matching can be disabled
+- Exports to JSON, CSV, or text tables
 - Additional filtering options for bodies (e.g. visibility)
 
 ## Installation
@@ -114,6 +116,24 @@ count,material,length (in),width (in),height (in),names
 2,Pine,4.00,2.00,0.50,"Back,Front"
 1,"Plywood, Finish",6.00,3.50,0.25,Bottom
 ```
+
+## Matching Rotations
+
+The addon uses the folowing algorithm to detect rotated parts:
+
+1. Find the convex planar face with the largest area. A convex face is a face
+   where all outer edges are convex in the context of the body.
+2. Find the orientation vector of the longest edge of the face
+3. Rotate the body so that the normal vector of the face is aligned with the Z
+   axis and the orientation vector of the longest edge is aligned with the X axis
+4. Return the axis-aligned bounding box of the rotated body
+
+This should produce correct results for most common situations in woodworking,
+where almost all parts will have at least one flat face that is aligned with
+one of the stock faces.
+
+Bodies that don't work with this algorithm use the axis-aligned bounding box
+computed by Fusion 360.
 
 ## License
 
