@@ -13,7 +13,7 @@ import adsk.core
 import adsk.fusion
 
 from .lib.texttable import Texttable
-from .lib.geometry.bodies import get_minimal_body
+from .lib.geometry.bodies import MinimalBody, get_minimal_body
 
 
 COMMAND_ID = 'ExportCutlistCommand'
@@ -38,7 +38,7 @@ class Dimensions:
     epsilon = 1e-06
 
     @classmethod
-    def from_body(cls, body):
+    def from_body(cls, body: MinimalBody):
         bbox = body.boundingBox
         x = bbox.maxPoint.x - bbox.minPoint.x
         y = bbox.maxPoint.y - bbox.minPoint.y
@@ -60,7 +60,7 @@ class Dimensions:
 
 
 class CutListItem:
-    def __init__(self, body, name):
+    def __init__(self, body: MinimalBody, name: str):
         self.names = [name]
         self.dimensions = Dimensions.from_body(body)
         self.material = body.material.name
@@ -72,7 +72,7 @@ class CutListItem:
     def matches(self, other, ignorematerial=False):
         if isinstance(other, CutListItem):
             return self.dimensions == other.dimensions and (ignorematerial or self.material == other.material)
-        elif isinstance(other, adsk.fusion.BRepBody):
+        elif isinstance(other, MinimalBody):
             return self.dimensions == Dimensions.from_body(other) and (ignorematerial or self.material == other.material.name)
         else:
             return False
@@ -89,7 +89,7 @@ class CutList:
         self.ignoreexternal = ignoreexternal
         self.namesep = namesep
 
-    def add_body(self, body, name):
+    def add_body(self, body: adsk.fusion.BRepBody, name: str):
         if not body.isSolid:
             return
 

@@ -7,38 +7,50 @@ from .edges import HashableEdge, is_linear_edge, is_orientable_edge, get_edge_or
 from .vectors import is_axis_aligned
 
 
-def get_minimal_body(body: adsk.fusion.BRepBody):
+class MinimalBody:
+    def __init__(self, body: adsk.fusion.BRepBody, bbox: adsk.core.BoundingBox3D = None) -> None:
+        self.body = body
+        self.bbox = bbox if bbox else body.boundingBox
+
+    @property
+    def material(self) -> adsk.core.Material:
+        return self.body.material
+
+    @property
+    def boundingBox(self) -> adsk.core.BoundingBox3D:
+        return self.bbox
+
+
+def get_minimal_body(body: adsk.fusion.BRepBody) -> MinimalBody:
     face = find_largest_planar_convex_face(body)
     if face is None:
-        return body
+        return MinimalBody(body)
 
-    (_, body_z) = face.evaluator.getNormalAtPoint(face.centroid)
-    if is_axis_aligned(body_z):
-        # face is already axis-aligned, skip transformations
-        return body
+    (_, normal) = face.evaluator.getNormalAtPoint(face.centroid)
+
+    edge = find_longest_orientable_edge(face)
+    if edge:
+        orientation = get_edge_orientation(edge)
+    else:
+        orientation = target_x
+
+    cross_orientation = orientation.crossProduct(normal)
+    cross_orientation.normalize()
 
     origin = adsk.core.Point3D.create()
     target_x = adsk.core.Vector3D.create(x=1)
     target_y = adsk.core.Vector3D.create(y=1)
     target_z = adsk.core.Vector3D.create(z=1)
 
-    edge = find_longest_orientable_edge(face)
-    if edge:
-        body_x = get_edge_orientation(edge)
-    else:
-        body_x = target_x
-
-    body_y = body_x.crossProduct(body_z)
-    body_y.normalize()
-
     transform = adsk.core.Matrix3D.create()
-    transform.setToAlignCoordinateSystems(origin, body_x, body_y, body_z, origin, target_x, target_y, target_z)
+    transform.setToAlignCoordinateSystems(origin, orientation, cross_orientation, normal, origin, target_x, target_y, target_z)
 
     brep_manager = adsk.fusion.TemporaryBRepManager.get()
 
     min_body = brep_manager.copy(body)
     brep_manager.transform(min_body, transform)
-    return min_body
+
+    return MinimalBody(body, min_body.boundingBox)
 
 
 # Returns the planar convex face with the largest area in body or None if no
