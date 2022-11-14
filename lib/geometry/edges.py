@@ -40,20 +40,19 @@ def get_edge_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Vector3D:
 
 
 def _get_arc3d_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Vector3D:
-    geom = adsk.core.Arc3D.case(edge.geometry)
+    geom = adsk.core.Arc3D.cast(edge.geometry)
     if not geom:
         raise ValueError('edge does not have Arc3D geometry')
 
-    # TODO(bkeyes): make sure edge start and end match curve start and end
     return _start_end_orientation(edge)
 
 
 def _get_circle3d_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Vector3D:
-    geom = adsk.core.Circle3D.case(edge.geometry)
+    geom = adsk.core.Circle3D.cast(edge.geometry)
     if not geom:
         raise ValueError('edge does not have Circle3D geometry')
 
-    # TODO(bkeyes): make sure Circle3D edges are always full circles
+    # TODO: are Circle3D edges are always full circles?
     return vectors.construct_perpedicular(geom.normal)
 
 
@@ -62,7 +61,7 @@ def _get_ellipse3d_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Vector3D
     if not geom:
         raise ValueError('edge does not have Ellipse3D geometry')
 
-    # TODO(bkeyes): make sure Ellipse3D edges are always full ellipses
+    # TODO: are Ellipse3D edges always full ellipses?
     ov = geom.majorAxis.copy()
     ov.normalize()
     return ov
@@ -73,7 +72,6 @@ def _get_ellipticalarc3d_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Ve
     if not geom:
         raise ValueError('edge does not have EllipticalArc3D geometry')
 
-    # TODO(bkeyes): make sure edge start and end match curve start and end
     return _start_end_orientation(edge)
 
 

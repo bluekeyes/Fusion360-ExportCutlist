@@ -2,7 +2,7 @@ import math
 
 import adsk.core
 
-# Return a new unit lengthe vector that is perpendicular to the input.
+# Return a new unit length vector that is perpendicular to the input.
 def construct_perpedicular(v: adsk.core.Vector3D) -> adsk.core.Vector3D:
     varr = v.asArray()
     parr = [0, 0, 0]
