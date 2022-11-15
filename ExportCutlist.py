@@ -146,11 +146,11 @@ class CutList:
 
 
 class Formatter:
-    def __init__(self, unitsMgr, units=None):
+    def __init__(self, unitsMgr: adsk.core.UnitsManager, units=None):
         self.unitsMgr = unitsMgr
         self.units = units if units else unitsMgr.defaultLengthUnits
 
-    def value(self, value, showunits=True):
+    def format_value(self, value, showunits=False):
         return self.unitsMgr.formatInternalValue(value, self.units, showunits)
 
     def cutlist(self, cutlist, fmt='json'):
@@ -169,9 +169,10 @@ class Formatter:
             return {
                 'count': item.count,
                 'dimensions': {
-                    'length': self.value(item.dimensions.length),
-                    'width': self.value(item.dimensions.width),
-                    'height': self.value(item.dimensions.height),
+                    'units': self.units,
+                    'length': self.format_value(item.dimensions.length),
+                    'width': self.format_value(item.dimensions.width),
+                    'height': self.format_value(item.dimensions.height),
                 },
                 'material': item.material,
                 'names': item.names,
@@ -186,9 +187,9 @@ class Formatter:
         def todict(item):
             return {
                 'count': item.count,
-                lengthkey: self.value(item.dimensions.length, False),
-                widthkey: self.value(item.dimensions.width, False),
-                heightkey: self.value(item.dimensions.height, False),
+                lengthkey: self.format_value(item.dimensions.length),
+                widthkey: self.format_value(item.dimensions.width),
+                heightkey: self.format_value(item.dimensions.height),
                 'material': item.material,
                 'names': ','.join(item.names),
             }
@@ -207,9 +208,9 @@ class Formatter:
             return [
                 item.count,
                 item.material,
-                self.value(item.dimensions.length, False),
-                self.value(item.dimensions.width, False),
-                self.value(item.dimensions.height, False),
+                self.format_value(item.dimensions.length),
+                self.format_value(item.dimensions.width),
+                self.format_value(item.dimensions.height),
                 '\n'.join(item.names),
             ]
 
