@@ -1,5 +1,3 @@
-import math
-
 import adsk.core
 
 # Return a new unit length vector that is perpendicular to the input.
