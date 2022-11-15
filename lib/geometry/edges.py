@@ -9,14 +9,6 @@ def is_orientable_edge(edge: adsk.fusion.BRepEdge) -> bool:
     return edge.geometry.curveType in _orientable_curve_types
 
 
-# Returns true if the edge is linear
-def is_linear_edge(edge: adsk.fusion.BRepEdge) -> bool:
-    return edge.geometry.curveType in [
-        adsk.core.Curve3DTypes.Line3DCurveType,
-        adsk.core.Curve3DTypes.InfiniteLine3DCurveType,
-    ]
-
-
 # Returns a vector giving the estimated orientation the edge
 def get_edge_orientation(edge: adsk.fusion.BRepEdge) -> adsk.core.Vector3D:
     fn = _orientable_curve_types.get(edge.geometry.curveType, None)
