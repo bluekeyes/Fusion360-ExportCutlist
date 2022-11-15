@@ -3,8 +3,7 @@ from typing import AbstractSet, List
 import adsk.core
 import adsk.fusion
 
-from .edges import HashableEdge, is_linear_edge, is_orientable_edge, get_edge_orientation
-from .vectors import is_axis_aligned
+from .edges import is_orientable_edge, get_edge_orientation
 
 
 class MinimalBody:
@@ -73,10 +72,6 @@ def find_largest_planar_face(body: adsk.fusion.BRepBody) -> adsk.fusion.BRepFace
 # Returns the edges in all outer loops of the face
 def get_outer_edges(face: adsk.fusion.BRepFace) -> List[adsk.fusion.BRepEdge]:
     return [edge for loop in face.loops for edge in loop.edges if loop.isOuter]
-
-
-def edgeset(edges) -> AbstractSet[HashableEdge]:
-    return set(HashableEdge(edge) for edge in edges)
 
 
 # Return the longest member of edges that has an orientation heuristic
