@@ -82,11 +82,12 @@ class CutListItem:
 
 
 class CutList:
-    def __init__(self, ignorehidden=False, ignorematerial=False, ignoreexternal=False, namesep='/'):
+    def __init__(self, ignorehidden=False, ignorematerial=False, ignoreexternal=False, axisaligned=False, namesep='/'):
         self.items = []
         self.ignorehidden = ignorehidden
         self.ignorematerial = ignorematerial
         self.ignoreexternal = ignoreexternal
+        self.axisaligned = axisaligned
         self.namesep = namesep
 
     def add_body(self, body: adsk.fusion.BRepBody, name: str):
@@ -96,7 +97,10 @@ class CutList:
         if not body.isVisible and self.ignorehidden:
             return
 
-        minimal_body = get_minimal_body(body)
+        if self.axisaligned:
+            minimal_body = MinimalBody(body, body.boundingBox)
+        else:
+            minimal_body = get_minimal_body(body)
 
         added = False
         for item in self.items:
@@ -248,13 +252,21 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         externalInput.tooltip = 'If checked, external components are excluded from the cutlist.'
 
         materialInput = inputs.addBoolValueInput('material', 'Ignore materials', True, '', False)
-        materialInput.tooltip = 'If checked, bodies with different materials will match if they have the same dimensions'
+        materialInput.tooltip = 'If checked, bodies with different materials will match if they have the same dimensions.'
 
         formatInput = inputs.addDropDownCommandInput('format', 'Output Format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         formatInput.tooltip = 'The output format of the cutlist.'
         formatInput.listItems.add('Table', True, '')
         formatInput.listItems.add('JSON', False, '')
         formatInput.listItems.add('CSV', False, '')
+
+        advancedGroup = inputs.addGroupCommandInput('advanced', 'Advanced Options')
+        advancedGroup.isEnabledCheckBoxDisplayed = False
+        advancedGroup.isExpanded = False
+
+        axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', False)
+        axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
+        axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z.'
 
         onExecute = CutlistCommandExecuteHandler()
         cmd.execute.add(onExecute)
@@ -279,11 +291,13 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         materialInput = inputs.itemById('material')
         selectionInput = inputs.itemById('selection')
         formatInput = inputs.itemById('format')
+        axisAlignedInput = inputs.itemById('axisaligned')
 
         cutlist = CutList(
             ignorehidden=hiddenInput.value,
             ignorematerial=materialInput.value,
             ignoreexternal=externalInput.value,
+            axisaligned=axisAlignedInput.value,
         )
         for i in range(selectionInput.selectionCount):
             cutlist.add(selectionInput.selection(i).entity)
