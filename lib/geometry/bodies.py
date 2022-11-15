@@ -22,7 +22,7 @@ class MinimalBody:
 
 
 def get_minimal_body(body: adsk.fusion.BRepBody) -> MinimalBody:
-    face = find_largest_planar_convex_face(body)
+    face = find_largest_planar_face(body)
     if face is None:
         return MinimalBody(body)
 
@@ -53,29 +53,21 @@ def get_minimal_body(body: adsk.fusion.BRepBody) -> MinimalBody:
     return MinimalBody(body, min_body.boundingBox)
 
 
-# Returns the planar convex face with the largest area in body or None if no
-# planar convex faces exist. In the context of this function, convex refers to
-# how the face is connected to other faces in the 3D body, not to the 2D shape
-# of the face in isolation.
-def find_largest_planar_convex_face(body: adsk.fusion.BRepBody) -> adsk.fusion.BRepFace:
-    convex_edges = edgeset(body.convexEdges)
-
+# Returns the planar face with the largest perimeter in body or None if no
+# planar faces exist. 
+def find_largest_planar_face(body: adsk.fusion.BRepBody) -> adsk.fusion.BRepFace:
     largest_face = None
+    max_perimeter = 0
     for f in body.faces:
-        if not is_planar_face(f, convex_edges):
+        if f.geometry.surfaceType != adsk.core.SurfaceTypes.PlaneSurfaceType:
             continue
-        if not largest_face or f.area > largest_face.area:
+
+        perimeter = sum(e.length for e in get_outer_edges(f))
+        if perimeter > max_perimeter:
             largest_face = f
+            max_perimeter = perimeter
 
     return largest_face
-
-
-# Returns true if face is a plane and all of its outer edges appear in the set edges.
-def is_planar_face(face: adsk.fusion.BRepFace, edges: AbstractSet[HashableEdge]) -> bool:
-    if face.geometry.surfaceType == adsk.core.SurfaceTypes.PlaneSurfaceType:
-        outer_edges = edgeset(get_outer_edges(face))
-        return outer_edges <= edges
-    return False
 
 
 # Returns the edges in all outer loops of the face
@@ -89,16 +81,11 @@ def edgeset(edges) -> AbstractSet[HashableEdge]:
 
 # Return the longest member of edges that has an orientation heuristic
 def find_longest_orientable_edge(face: adsk.fusion.BRepFace):
-    longest_linear_edge = None
-    longest_nonlinear_edge = None
+    longest_edge = None
 
     for e in face.edges:
-        if is_linear_edge(e):
-            if not longest_linear_edge or e.length > longest_linear_edge.length:
-                longest_linear_edge = e
+        if is_orientable_edge(e):
+            if not longest_edge or e.length > longest_edge.length:
+                longest_edge = e
 
-        elif is_orientable_edge(e):
-            if not longest_nonlinear_edge or e.length > longest_nonlinear_edge.length:
-                longest_nonlinear_edge = e
-
-    return longest_linear_edge if longest_linear_edge else longest_nonlinear_edge
+    return longest_edge

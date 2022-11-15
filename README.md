@@ -121,8 +121,7 @@ count,material,length (in),width (in),height (in),names
 
 The addon uses the folowing algorithm to detect rotated parts:
 
-1. Find the convex planar face with the largest area. A convex face is a face
-   where all outer edges are convex in the context of the body.
+1. Find the planar face with the largest perimeter
 2. Find the orientation vector of the longest edge of the face
 3. Rotate the body so that the normal vector of the face is aligned with the Z
    axis and the orientation vector of the longest edge is aligned with the X axis
@@ -130,10 +129,12 @@ The addon uses the folowing algorithm to detect rotated parts:
 
 This should produce correct results for most common situations in woodworking,
 where almost all parts will have at least one flat face that is aligned with
-one of the stock faces.
+one of the stock faces. 
 
-Bodies that don't work with this algorithm use the axis-aligned bounding box
-computed by Fusion 360.
+Bodies that don't work with this algorithm (e.g. because they have no planar
+faces) use the axis-aligned bounding box computed by Fusion 360. You can also
+disable the rotation heuristic and always use axis-aligned boxes in the advanced
+options.
 
 ## License
 
