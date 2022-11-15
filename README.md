@@ -120,7 +120,7 @@ count,material,length (in),width (in),height (in),names
 1,"Plywood, Finish",6.00,3.50,0.25,Bottom
 ```
 
-## Matching Rotations
+## Matching Rotation
 
 The addon uses the folowing algorithm to detect rotated parts:
 
