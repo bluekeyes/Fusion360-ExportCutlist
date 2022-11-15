@@ -70,9 +70,10 @@ count      material       length (in)   width (in)   height (in)   names
   {
     "count": 2,
     "dimensions": {
-      "length": "6.00 in",
-      "width": "2.00 in",
-      "height": "0.50 in"
+      "units": "in",
+      "length": "6.00",
+      "width": "2.00",
+      "height": "0.50"
     },
     "material": "Pine",
     "names": [
@@ -83,9 +84,10 @@ count      material       length (in)   width (in)   height (in)   names
   {
     "count": 2,
     "dimensions": {
-      "length": "4.00 in",
-      "width": "2.00 in",
-      "height": "0.50 in"
+      "units": "in",
+      "length": "4.00",
+      "width": "2.00",
+      "height": "0.50"
     },
     "material": "Pine",
     "names": [
@@ -96,9 +98,10 @@ count      material       length (in)   width (in)   height (in)   names
   {
     "count": 1,
     "dimensions": {
-      "length": "6.00 in",
-      "width": "3.50 in",
-      "height": "0.25 in"
+      "units": "in",
+      "length": "6.00",
+      "width": "3.50",
+      "height": "0.25"
     },
     "material": "Plywood, Finish",
     "names": [
