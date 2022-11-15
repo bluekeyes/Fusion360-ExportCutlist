@@ -19,6 +19,9 @@ from .lib.geometry.bodies import MinimalBody, get_minimal_body
 COMMAND_ID = 'ExportCutlistCommand'
 COMMAND_NAME = 'Export Cutlist'
 
+DEFAULT_TOLERANCE = 1e-04
+
+
 # required to keep handlers in scope
 handlers = []
 
@@ -35,7 +38,7 @@ def report_errors(func):
 
 
 class Dimensions:
-    epsilon = 1e-06
+    tolerance = DEFAULT_TOLERANCE
 
     @classmethod
     def from_body(cls, body: MinimalBody):
@@ -53,9 +56,9 @@ class Dimensions:
 
     def __eq__(self, other):
         if isinstance(other, Dimensions):
-            return (abs(self.length - other.length) < Dimensions.epsilon and
-                    abs(self.width - other.width) < Dimensions.epsilon and
-                    abs(self.height - other.height) < Dimensions.epsilon)
+            return (abs(self.length - other.length) < Dimensions.tolerance and
+                    abs(self.width - other.width) < Dimensions.tolerance and
+                    abs(self.height - other.height) < Dimensions.tolerance)
         return NotImplemented
 
 
@@ -269,6 +272,9 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
         axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z.'
 
+        toleranceInput = advancedGroup.children.addValueInput('tolerance', 'Tolerance', 'mm', adsk.core.ValueInput.createByReal(DEFAULT_TOLERANCE))
+        toleranceInput.tooltip = 'The tolerance used when matching bounding box dimensions.'
+
         onExecute = CutlistCommandExecuteHandler()
         cmd.execute.add(onExecute)
         handlers.append(onExecute)
@@ -293,6 +299,10 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         selectionInput = inputs.itemById('selection')
         formatInput = inputs.itemById('format')
         axisAlignedInput = inputs.itemById('axisaligned')
+        toleranceInput = inputs.itemById('tolerance')
+
+        if toleranceInput.value > 0:
+            Dimensions.tolerance = toleranceInput.value
 
         cutlist = CutList(
             ignorehidden=hiddenInput.value,
