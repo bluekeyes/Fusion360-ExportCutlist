@@ -98,7 +98,7 @@ class CutList:
             return
 
         if self.axisaligned:
-            minimal_body = MinimalBody(body, body.boundingBox)
+            minimal_body = MinimalBody(body)
         else:
             minimal_body = get_minimal_body(body)
 
