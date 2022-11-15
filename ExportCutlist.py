@@ -5,19 +5,23 @@ import csv
 import functools
 import io
 import json
+import traceback
 
-from collections import namedtuple
 from operator import attrgetter
 
-import adsk.core, adsk.fusion, traceback
+import adsk.core
+import adsk.fusion
 
 from .lib.texttable import Texttable
+from .lib.geometry.bodies import MinimalBody, get_minimal_body
+
 
 COMMAND_ID = 'ExportCutlistCommand'
 COMMAND_NAME = 'Export Cutlist'
 
 # required to keep handlers in scope
 handlers = []
+
 
 def report_errors(func):
     @functools.wraps(func)
@@ -29,11 +33,12 @@ def report_errors(func):
             app.userInterface.messageBox('Failed:\n{}'.format(traceback.format_exc()))
     return wrapper
 
+
 class Dimensions:
-    epsilon = 0.0001
+    epsilon = 1e-06
 
     @classmethod
-    def from_body(cls, body):
+    def from_body(cls, body: MinimalBody):
         bbox = body.boundingBox
         x = bbox.maxPoint.x - bbox.minPoint.x
         y = bbox.maxPoint.y - bbox.minPoint.y
@@ -55,78 +60,81 @@ class Dimensions:
 
 
 class CutListItem:
-    def __init__(self, body, name, ignorematerial=False):
+    def __init__(self, body: MinimalBody, name: str):
         self.names = [name]
         self.dimensions = Dimensions.from_body(body)
-
-        self.ignorematerial = ignorematerial
-        if ignorematerial:
-            self.material = None
-        else:
-            self.material = body.material.name
+        self.material = body.material.name
 
     @property
     def count(self):
         return len(self.names)
 
-    def add(self, body, name=None):
-        dimensions = Dimensions.from_body(body)
-        matches = self.dimensions == dimensions and (self.ignorematerial or self.material == body.material.name)
-
-        if matches:
-            self.names.append(name if name else body.name)
-            return True
+    def matches(self, other, ignorematerial=False):
+        if isinstance(other, CutListItem):
+            return self.dimensions == other.dimensions and (ignorematerial or self.material == other.material)
+        elif isinstance(other, MinimalBody):
+            return self.dimensions == Dimensions.from_body(other) and (ignorematerial or self.material == other.material.name)
         else:
             return False
 
+    def add_instance(self, name):
+        self.names.append(name)
+
 
 class CutList:
-    def __init__(self, ignorehidden=False, ignorematerial=False, ignoreexternal=False, namesep='/'):
+    def __init__(self, ignorehidden=False, ignorematerial=False, ignoreexternal=False, axisaligned=False, namesep='/'):
         self.items = []
         self.ignorehidden = ignorehidden
         self.ignorematerial = ignorematerial
         self.ignoreexternal = ignoreexternal
+        self.axisaligned = axisaligned
         self.namesep = namesep
 
-    def addBody(self, body, name):
+    def add_body(self, body: adsk.fusion.BRepBody, name: str):
         if not body.isSolid:
             return
 
         if not body.isVisible and self.ignorehidden:
             return
 
+        if self.axisaligned:
+            minimal_body = MinimalBody(body)
+        else:
+            minimal_body = get_minimal_body(body)
+
         added = False
         for item in self.items:
-            if item.add(body, name):
+            if item.matches(minimal_body, ignorematerial=self.ignorematerial):
+                item.add_instance(name)
                 added = True
                 break
 
         if not added:
-            item = CutListItem(body, name, ignorematerial=self.ignorematerial)
+            item = CutListItem(minimal_body, name)
             self.items.append(item)
 
     def add(self, obj, name=None):
-        if type(obj) is adsk.fusion.BRepBody:
-            self.addBody(obj, self._joinname(name, obj.name))
+        if isinstance(obj, adsk.fusion.BRepBody):
+            self.add_body(obj, self._joinname(name, obj.name))
 
-        elif type(obj) is adsk.fusion.Occurrence:
+        elif isinstance(obj, adsk.fusion.Occurrence):
             if obj.isReferencedComponent and self.ignoreexternal:
                 return 
             for body in obj.bRepBodies:
-                self.addBody(body, self._joinname(name, obj.component.name, body.name))
+                self.add_body(body, self._joinname(name, obj.component.name, body.name))
             for child in obj.childOccurrences:
                 self.add(child, self._joinname(name, obj.component.name))
 
-        elif type(obj) is adsk.fusion.Component:
+        elif isinstance(obj, adsk.fusion.Component):
             for body in obj.bRepBodies:
-                self.addBody(body, self._joinname(name, obj.name, body.name))
+                self.add_body(body, self._joinname(name, obj.name, body.name))
             for occ in obj.occurrences:
                 self.add(occ, self._joinname(name, obj.name))
 
         else:
             raise ValueError(f'Cannot add object with type: {obj.objectType}')
 
-    def sortedItems(self):
+    def sorted_items(self):
         items = list(self.items)
         items.sort(key=lambda i: attrgetter('length', 'width', 'height')(i.dimensions), reverse=True)
         items.sort(key=attrgetter('count'), reverse=True)
@@ -169,7 +177,7 @@ class Formatter:
                 'names': item.names,
             }
 
-        return json.dumps([todict(item) for item in cutlist.sortedItems()], indent=2)
+        return json.dumps([todict(item) for item in cutlist.sorted_items()], indent=2)
 
     def _cutlistcsv(self, cutlist):
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
@@ -188,7 +196,7 @@ class Formatter:
         with io.StringIO(newline='') as f:
             w = csv.DictWriter(f, fieldnames=fieldnames)
             w.writeheader()
-            w.writerows([todict(item) for item in cutlist.sortedItems()])
+            w.writerows([todict(item) for item in cutlist.sorted_items()])
             return f.getvalue()
 
     def _cutlisttable(self, cutlist):
@@ -210,7 +218,7 @@ class Formatter:
         tt.header(fieldnames)
         tt.set_cols_dtype(['i', 't', 't', 't', 't', 't'])
         tt.set_cols_align(['r', 'l', 'r', 'r', 'r', 'l'])
-        tt.add_rows([torow(item) for item in cutlist.sortedItems()], header=False)
+        tt.add_rows([torow(item) for item in cutlist.sorted_items()], header=False)
         return tt.draw()
 
 
@@ -244,13 +252,21 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         externalInput.tooltip = 'If checked, external components are excluded from the cutlist.'
 
         materialInput = inputs.addBoolValueInput('material', 'Ignore materials', True, '', False)
-        materialInput.tooltip = 'If checked, bodies with different materials will match if they have the same dimensions'
+        materialInput.tooltip = 'If checked, bodies with different materials will match if they have the same dimensions.'
 
         formatInput = inputs.addDropDownCommandInput('format', 'Output Format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         formatInput.tooltip = 'The output format of the cutlist.'
         formatInput.listItems.add('Table', True, '')
         formatInput.listItems.add('JSON', False, '')
         formatInput.listItems.add('CSV', False, '')
+
+        advancedGroup = inputs.addGroupCommandInput('advanced', 'Advanced Options')
+        advancedGroup.isEnabledCheckBoxDisplayed = False
+        advancedGroup.isExpanded = False
+
+        axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', False)
+        axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
+        axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z.'
 
         onExecute = CutlistCommandExecuteHandler()
         cmd.execute.add(onExecute)
@@ -275,11 +291,13 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         materialInput = inputs.itemById('material')
         selectionInput = inputs.itemById('selection')
         formatInput = inputs.itemById('format')
+        axisAlignedInput = inputs.itemById('axisaligned')
 
         cutlist = CutList(
             ignorehidden=hiddenInput.value,
             ignorematerial=materialInput.value,
             ignoreexternal=externalInput.value,
+            axisaligned=axisAlignedInput.value,
         )
         for i in range(selectionInput.selectionCount):
             cutlist.add(selectionInput.selection(i).entity)
