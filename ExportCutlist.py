@@ -25,6 +25,16 @@ DEFAULT_TOLERANCE = 1e-04
 # required to keep handlers in scope
 handlers = []
 
+# remember user options in between creations of the command
+preferences = {
+    'ignoreHidden': True,
+    'ignoreExternal': False,
+    'ignoreMaterial': False,
+    'format': 'table',
+    'axisAligned': False,
+    'tolerance': DEFAULT_TOLERANCE,
+}
+
 
 def report_errors(func):
     @functools.wraps(func)
@@ -249,30 +259,30 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         selectInput.addSelectionFilter('Occurrences')
         selectInput.setSelectionLimits(0)
 
-        hiddenInput = inputs.addBoolValueInput('hidden', 'Ignore hidden', True, '', True)
+        hiddenInput = inputs.addBoolValueInput('hidden', 'Ignore hidden', True, '', preferences['ignoreHidden'])
         hiddenInput.tooltip = 'If checked, hidden bodies are excluded from the cutlist.'
 
-        externalInput = inputs.addBoolValueInput('external', 'Ignore external', True, '', False)
+        externalInput = inputs.addBoolValueInput('external', 'Ignore external', True, '', preferences['ignoreExternal'])
         externalInput.tooltip = 'If checked, external components are excluded from the cutlist.'
 
-        materialInput = inputs.addBoolValueInput('material', 'Ignore materials', True, '', False)
+        materialInput = inputs.addBoolValueInput('material', 'Ignore materials', True, '', preferences['ignoreMaterial'])
         materialInput.tooltip = 'If checked, bodies with different materials will match if they have the same dimensions.'
 
         formatInput = inputs.addDropDownCommandInput('format', 'Output Format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         formatInput.tooltip = 'The output format of the cutlist.'
-        formatInput.listItems.add('Table', True, '')
-        formatInput.listItems.add('JSON', False, '')
-        formatInput.listItems.add('CSV', False, '')
+        formatInput.listItems.add('Table', preferences['format'] == 'table', '')
+        formatInput.listItems.add('JSON', preferences['format'] == 'json', '')
+        formatInput.listItems.add('CSV', preferences['format'] == 'csv', '')
 
         advancedGroup = inputs.addGroupCommandInput('advanced', 'Advanced Options')
         advancedGroup.isEnabledCheckBoxDisplayed = False
         advancedGroup.isExpanded = False
 
-        axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', False)
+        axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', preferences['axisAligned'])
         axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
         axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z.'
 
-        toleranceInput = advancedGroup.children.addValueInput('tolerance', 'Tolerance', 'mm', adsk.core.ValueInput.createByReal(DEFAULT_TOLERANCE))
+        toleranceInput = advancedGroup.children.addValueInput('tolerance', 'Tolerance', 'mm', adsk.core.ValueInput.createByReal(preferences['tolerance']))
         toleranceInput.tooltip = 'The tolerance used when matching bounding box dimensions.'
 
         onExecute = CutlistCommandExecuteHandler()
@@ -293,28 +303,24 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         ui = app.userInterface
         design = adsk.fusion.Design.cast(app.activeProduct)
 
-        hiddenInput = inputs.itemById('hidden')
-        externalInput = inputs.itemById('external')
-        materialInput = inputs.itemById('material')
-        selectionInput = inputs.itemById('selection')
-        formatInput = inputs.itemById('format')
-        axisAlignedInput = inputs.itemById('axisaligned')
-        toleranceInput = inputs.itemById('tolerance')
+        set_preferences_from_inputs(inputs)
 
-        if toleranceInput.value > 0:
-            Dimensions.tolerance = toleranceInput.value
+        if preferences['tolerance'] > 0:
+            Dimensions.tolerance = preferences['tolerance']
 
         cutlist = CutList(
-            ignorehidden=hiddenInput.value,
-            ignorematerial=materialInput.value,
-            ignoreexternal=externalInput.value,
-            axisaligned=axisAlignedInput.value,
+            ignorehidden=preferences['ignoreHidden'],
+            ignorematerial=preferences['ignoreMaterial'],
+            ignoreexternal=preferences['ignoreExternal'],
+            axisaligned=preferences['axisAligned'],
         )
+
+        selectionInput = inputs.itemById('selection')
         for i in range(selectionInput.selectionCount):
             cutlist.add(selectionInput.selection(i).entity)
 
         newline = None
-        fmt = formatInput.selectedItem.name.lower()
+        fmt = preferences['format']
         if fmt == 'json':
             filefilter = 'JSON Files (*.json)'
         elif fmt == 'csv':
@@ -335,6 +341,22 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
             f.write(formatter.cutlist(cutlist, fmt=fmt))
 
         ui.messageBox(f'Export complete: {filename}', COMMAND_NAME)
+
+
+def set_preferences_from_inputs(inputs: adsk.core.CommandInputs):
+    hiddenInput: adsk.core.BoolValueCommandInput = inputs.itemById('hidden')
+    externalInput: adsk.core.BoolValueCommandInput = inputs.itemById('external')
+    materialInput: adsk.core.BoolValueCommandInput = inputs.itemById('material')
+    formatInput: adsk.core.DropDownCommandInput = inputs.itemById('format')
+    axisAlignedInput: adsk.core.BoolValueCommandInput = inputs.itemById('axisaligned')
+    toleranceInput: adsk.core.ValueCommandInput = inputs.itemById('tolerance')
+
+    preferences['ignoreHidden'] = hiddenInput.value
+    preferences['ignoreExternal'] = externalInput.value
+    preferences['ignoreMaterial'] = materialInput.value
+    preferences['format'] = formatInput.selectedItem.name.lower()
+    preferences['axisAligned'] = axisAlignedInput.value
+    preferences['tolerance'] = toleranceInput.value
 
 
 @report_errors
