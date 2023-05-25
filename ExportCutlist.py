@@ -347,10 +347,7 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         fmt = preferences['format']
         if fmt == JSON:
             filefilter = 'JSON Files (*.json)'
-        elif fmt == CSV:
-            filefilter = 'CSV Files (*.csv)'
-            newline = ''
-        elif fmt == CSV_CUTLISTOPTIMIZER:
+        elif fmt in [CSV, CSV_CUTLISTOPTIMIZER]:
             filefilter = 'CSV Files (*.csv)'
             newline = ''
         else:
