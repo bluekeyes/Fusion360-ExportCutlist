@@ -51,7 +51,6 @@ def report_errors(func):
     return wrapper
 
 
-
 class Dimensions:
     tolerance = DEFAULT_TOLERANCE
 
