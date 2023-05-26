@@ -25,16 +25,20 @@ DEFAULT_TOLERANCE = 1e-04
 # required to keep handlers in scope
 handlers = []
 
+TABLE = 'table'
+JSON = 'json'
+CSV = 'csv'
+CSV_CUTLISTOPTIMIZER = 'csv (custlist optimizer)'
+
 # remember user options in between creations of the command
 preferences = {
     'ignoreHidden': True,
     'ignoreExternal': False,
     'ignoreMaterial': False,
-    'format': 'table',
+    'format': TABLE,
     'axisAligned': False,
     'tolerance': DEFAULT_TOLERANCE,
 }
-
 
 def report_errors(func):
     @functools.wraps(func)
@@ -166,13 +170,15 @@ class Formatter:
     def format_value(self, value, showunits=False):
         return self.unitsMgr.formatInternalValue(value, self.units, showunits)
 
-    def cutlist(self, cutlist, fmt='json'):
+    def cutlist(self, cutlist, fmt=JSON):
         fmt = fmt.lower()
-        if fmt == 'json':
+        if fmt == JSON:
             return self._cutlistjson(cutlist)
-        elif fmt == 'csv':
+        elif fmt == CSV:
             return self._cutlistcsv(cutlist)
-        elif fmt == 'table':
+        elif fmt == CSV_CUTLISTOPTIMIZER:
+            return self._cutlistcsv(cutlist, cutlist_optimizer=True)
+        elif fmt == TABLE:
             return self._cutlisttable(cutlist)
         else:
             raise ValueError(f'unsupported format: {fmt}')
@@ -193,19 +199,35 @@ class Formatter:
 
         return json.dumps([todict(item) for item in cutlist.sorted_items()], indent=2)
 
-    def _cutlistcsv(self, cutlist):
-        lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
-        fieldnames = ['count', 'material', lengthkey, widthkey, heightkey, 'names']
+    def _cutlistcsv(self, cutlist, cutlist_optimizer=False):
+        if cutlist_optimizer:
+            '''
+            Exports the cutlist in a CSV format intended for import on https://cutlistoptimizer.com/
+            '''
+            fieldnames = ['Length', 'Width', 'Qty', 'Label', 'Enabled']
+            
+            def todict(item):
+                return {
+                    'Length': self.format_value(item.dimensions.length),
+                    'Width': self.format_value(item.dimensions.width),
+                    'Qty': item.count,
+                    'Label': ','.join(item.names),
+                    'Enabled': 'true'
+                }
+        
+        else:
+            lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
+            fieldnames = ['count', 'material', lengthkey, widthkey, heightkey, 'names']
 
-        def todict(item):
-            return {
-                'count': item.count,
-                lengthkey: self.format_value(item.dimensions.length),
-                widthkey: self.format_value(item.dimensions.width),
-                heightkey: self.format_value(item.dimensions.height),
-                'material': item.material,
-                'names': ','.join(item.names),
-            }
+            def todict(item):
+                return {
+                    'count': item.count,
+                    lengthkey: self.format_value(item.dimensions.length),
+                    widthkey: self.format_value(item.dimensions.width),
+                    heightkey: self.format_value(item.dimensions.height),
+                    'material': item.material,
+                    'names': ','.join(item.names),
+                }
 
         with io.StringIO(newline='') as f:
             w = csv.DictWriter(f, fieldnames=fieldnames)
@@ -270,9 +292,10 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
         formatInput = inputs.addDropDownCommandInput('format', 'Output Format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         formatInput.tooltip = 'The output format of the cutlist.'
-        formatInput.listItems.add('Table', preferences['format'] == 'table', '')
-        formatInput.listItems.add('JSON', preferences['format'] == 'json', '')
-        formatInput.listItems.add('CSV', preferences['format'] == 'csv', '')
+        formatInput.listItems.add('Table', preferences['format'] == TABLE, '')
+        formatInput.listItems.add('JSON', preferences['format'] == JSON, '')
+        formatInput.listItems.add('CSV', preferences['format'] == CSV, '')
+        formatInput.listItems.add('CSV (Custlist Optimizer)', preferences['format'] == CSV_CUTLISTOPTIMIZER, '')
 
         advancedGroup = inputs.addGroupCommandInput('advanced', 'Advanced Options')
         advancedGroup.isEnabledCheckBoxDisplayed = False
@@ -321,9 +344,9 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 
         newline = None
         fmt = preferences['format']
-        if fmt == 'json':
+        if fmt == JSON:
             filefilter = 'JSON Files (*.json)'
-        elif fmt == 'csv':
+        elif fmt in [CSV, CSV_CUTLISTOPTIMIZER]:
             filefilter = 'CSV Files (*.csv)'
             newline = ''
         else:
