@@ -16,7 +16,7 @@ document structure or workflow.
   - The largest dimension is called `length`, the next largest `width`, and the smallest `height`
   - Accounts for [part rotation](#matching-rotation) when matching bounding boxes
   - Material matching can be disabled
-- Exports to JSON, CSV, or text tables
+- Exports to text, HTML, JSON, CSV, and more
 - Additional filtering options for bodies (e.g. visibility)
 
 ## Installation
@@ -41,6 +41,17 @@ and bodies and set other options:
 When you are ready to export, click "OK". A file selection dialog will open
 asking where to save the file. Choose a file and click "Save". A message box
 will open confirming the file was saved.
+
+## Formats
+
+The addon can export cutlists in the following formats:
+
+* Plain text
+* JSON
+* HTML
+* CSV
+* CSV as used by https://cutlistoptimizer.com
+* TSV as used by https://cutlistevo.com
 
 ## Example Output
 
