@@ -219,6 +219,7 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 
         app = adsk.core.Application.get()
         ui = app.userInterface
+        doc = app.activeDocument
         design = adsk.fusion.Design.cast(app.activeProduct)
 
         set_preferences_from_inputs(inputs)
@@ -248,7 +249,7 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         filename = dlg.filename
         newline = '' if issubclass(fmt_class, CSVFormat) else None
         with io.open(filename, 'w', newline=newline) as f:
-            format = fmt_class(design.unitsManager)
+            format = fmt_class(design.unitsManager, doc.name)
             f.write(format.format(cutlist))
 
         ui.messageBox(f'Export complete: {filename}', COMMAND_NAME)

@@ -1,6 +1,8 @@
 import csv
+import html
 import io
 import json
+import textwrap
 
 import adsk.core
 
@@ -8,8 +10,9 @@ from .texttable import Texttable
 
 
 class Format:
-    def __init__(self, unitsMgr: adsk.core.UnitsManager, units=None):
+    def __init__(self, unitsMgr: adsk.core.UnitsManager, docname: str, units=None):
         self.unitsMgr = unitsMgr
+        self.docname = docname
         self.units = units if units else unitsMgr.defaultLengthUnits
 
     def format_value(self, value, showunits=False):
@@ -156,10 +159,64 @@ class TableFormat(Format):
         return tt.draw()
 
 
+class HTMLFormat(Format):
+    name = 'HTML'
+    filefilter = 'HTML Files (*.html)'
+
+    @property
+    def fieldnames(self):
+        lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['Length', 'Width', 'Height']]
+        return ['Count', lengthkey, widthkey, heightkey, 'Material', 'Names']
+
+    def item_to_row(self, item):
+        cols = [
+            item.count,
+            self.format_value(item.dimensions.length),
+            self.format_value(item.dimensions.width),
+            self.format_value(item.dimensions.height),
+            html.escape(item.material),
+            '<br>'.join(html.escape(n) for n in item.names),
+        ]
+        return '<tr>' + ''.join(f'<td>{c}</td>' for c in cols) + '</tr>'
+
+    def format(self, cutlist):
+        title = html.escape(self.docname)
+        header = ''.join(f'<th>{html.escape(h)}</th>' for h in self.fieldnames)
+        rows = ''.join(self.item_to_row(item) for item in cutlist.sorted_items())
+
+        return textwrap.dedent(f'''\
+            <html>
+                <title>{title} Cutlist</title>
+                <style>
+                    table {{
+                        border: 1px solid #000;
+                        border-collapse: collapse;
+                    }}
+                    td, th {{
+                        border: 1px solid #000;
+                        padding: 0.25em 0.5em;
+                    }}
+                    thead {{
+                        background-color: #eee;
+                    }}
+                </style>
+            </html>
+            </body>
+                <h1>{title} Cutlist</h1>
+                <table>
+                    <thead>{header}</thead>
+                    <tbody>{rows}</tbody>
+                </table>
+            </body>
+        ''')
+
+
+
 ALL_FORMATS = [
     TableFormat,
-    JSONFormat,
     CSVFormat,
+    JSONFormat,
+    HTMLFormat,
     CutlistOptimizerFormat,
     CutlistEvoFormat,
 ]
