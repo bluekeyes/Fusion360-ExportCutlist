@@ -3,17 +3,36 @@ import html
 import io
 import json
 import textwrap
+import typing
 
 import adsk.core
 
 from .texttable import Texttable
 
 
+class FileFilter:
+    def __init__(self, name, ext):
+        self.name = name
+        self.ext = ext
+
+    @property
+    def filter_str(self):
+        return f'{self.name} (*.{self.ext})'
+
+
 class Format:
+    name = 'Base Format'
+    filefilter = FileFilter('Text Files', 'txt')
+
     def __init__(self, unitsMgr: adsk.core.UnitsManager, docname: str, units=None):
         self.unitsMgr = unitsMgr
         self.docname = docname
         self.units = units if units else unitsMgr.defaultLengthUnits
+
+    @property
+    def filename(self):
+        name = self.docname.lower().replace(' ', '_')
+        return f'{name}.{self.filefilter.ext}'
 
     def format_value(self, value, showunits=False):
         return self.unitsMgr.formatInternalValue(value, self.units, showunits)
@@ -24,7 +43,7 @@ class Format:
 
 class JSONFormat(Format):
     name = 'JSON'
-    filefilter = 'JSON Files (*.json)'
+    filefilter = FileFilter('JSON Files', 'json')
 
     def item_to_dict(self, item):
         return {
@@ -45,7 +64,7 @@ class JSONFormat(Format):
 
 class CSVFormat(Format):
     name = 'CSV'
-    filefilter = 'CSV Files (*.csv)'
+    filefilter = FileFilter('CSV Files', 'csv')
 
     dialect = 'excel'
 
@@ -108,7 +127,7 @@ class CutlistEvoFormat(CSVFormat):
     '''
 
     name = 'Cutlist Evo'
-    filefilter = "Text Files (*.txt)"
+    filefilter = FileFilter('Text Files', 'txt')
 
     dialect = 'excel-tab'
 
@@ -132,7 +151,6 @@ class CutlistEvoFormat(CSVFormat):
 
 class TableFormat(Format):
     name = 'Table'
-    filefilter = 'Text Files (*.txt)'
 
     @property
     def fieldnames(self):
@@ -161,7 +179,7 @@ class TableFormat(Format):
 
 class HTMLFormat(Format):
     name = 'HTML'
-    filefilter = 'HTML Files (*.html)'
+    filefilter = FileFilter('HTML Files', 'html')
 
     @property
     def fieldnames(self):
@@ -222,7 +240,7 @@ ALL_FORMATS = [
 ]
 
 
-def get_format(name):
+def get_format(name: str) -> typing.Type[Format]:
     for fmt in ALL_FORMATS:
         if fmt.name == name:
             return fmt

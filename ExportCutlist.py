@@ -239,18 +239,19 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
             cutlist.add(selectionInput.selection(i).entity)
 
         fmt_class = get_format(preferences['format'])
+        fmt = fmt_class(design.unitsManager, doc.name)
 
         dlg = ui.createFileDialog()
         dlg.title = 'Save Cutlist'
-        dlg.filter = fmt_class.filefilter
+        dlg.filter = fmt.filefilter.filter_str
+        dlg.initialFilename = fmt.filename
         if dlg.showSave() != adsk.core.DialogResults.DialogOK:
             return
 
         filename = dlg.filename
-        newline = '' if issubclass(fmt_class, CSVFormat) else None
+        newline = '' if isinstance(fmt, CSVFormat) else None
         with io.open(filename, 'w', newline=newline) as f:
-            format = fmt_class(design.unitsManager, doc.name)
-            f.write(format.format(cutlist))
+            f.write(fmt.format(cutlist))
 
         ui.messageBox(f'Export complete: {filename}', COMMAND_NAME)
 
