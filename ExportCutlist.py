@@ -1,10 +1,8 @@
 #Author-Billy Keyes
 #Description-Export a cut list of all bodies as a JSON file
 
-import csv
 import functools
 import io
-import json
 import traceback
 
 from operator import attrgetter
@@ -12,7 +10,7 @@ from operator import attrgetter
 import adsk.core
 import adsk.fusion
 
-from .lib.texttable import Texttable
+from .lib.format import ALL_FORMATS, TableFormat, CSVFormat, get_format
 from .lib.geometry.bodies import MinimalBody, get_minimal_body
 
 
@@ -25,17 +23,12 @@ DEFAULT_TOLERANCE = 1e-04
 # required to keep handlers in scope
 handlers = []
 
-TABLE = 'table'
-JSON = 'json'
-CSV = 'csv'
-CSV_CUTLISTOPTIMIZER = 'csv (custlist optimizer)'
-
 # remember user options in between creations of the command
 preferences = {
     'ignoreHidden': True,
     'ignoreExternal': False,
     'ignoreMaterial': False,
-    'format': TABLE,
+    'format': TableFormat.name,
     'axisAligned': False,
     'tolerance': DEFAULT_TOLERANCE,
 }
@@ -162,102 +155,6 @@ class CutList:
         return self.namesep.join([p for p in parts if p])
 
 
-class Formatter:
-    def __init__(self, unitsMgr: adsk.core.UnitsManager, units=None):
-        self.unitsMgr = unitsMgr
-        self.units = units if units else unitsMgr.defaultLengthUnits
-
-    def format_value(self, value, showunits=False):
-        return self.unitsMgr.formatInternalValue(value, self.units, showunits)
-
-    def cutlist(self, cutlist, fmt=JSON):
-        fmt = fmt.lower()
-        if fmt == JSON:
-            return self._cutlistjson(cutlist)
-        elif fmt == CSV:
-            return self._cutlistcsv(cutlist)
-        elif fmt == CSV_CUTLISTOPTIMIZER:
-            return self._cutlistcsv(cutlist, cutlist_optimizer=True)
-        elif fmt == TABLE:
-            return self._cutlisttable(cutlist)
-        else:
-            raise ValueError(f'unsupported format: {fmt}')
-
-    def _cutlistjson(self, cutlist):
-        def todict(item):
-            return {
-                'count': item.count,
-                'dimensions': {
-                    'units': self.units,
-                    'length': self.format_value(item.dimensions.length),
-                    'width': self.format_value(item.dimensions.width),
-                    'height': self.format_value(item.dimensions.height),
-                },
-                'material': item.material,
-                'names': item.names,
-            }
-
-        return json.dumps([todict(item) for item in cutlist.sorted_items()], indent=2)
-
-    def _cutlistcsv(self, cutlist, cutlist_optimizer=False):
-        if cutlist_optimizer:
-            '''
-            Exports the cutlist in a CSV format intended for import on https://cutlistoptimizer.com/
-            '''
-            fieldnames = ['Length', 'Width', 'Qty', 'Label', 'Enabled']
-            
-            def todict(item):
-                return {
-                    'Length': self.format_value(item.dimensions.length),
-                    'Width': self.format_value(item.dimensions.width),
-                    'Qty': item.count,
-                    'Label': ','.join(item.names),
-                    'Enabled': 'true'
-                }
-        
-        else:
-            lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
-            fieldnames = ['count', 'material', lengthkey, widthkey, heightkey, 'names']
-
-            def todict(item):
-                return {
-                    'count': item.count,
-                    lengthkey: self.format_value(item.dimensions.length),
-                    widthkey: self.format_value(item.dimensions.width),
-                    heightkey: self.format_value(item.dimensions.height),
-                    'material': item.material,
-                    'names': ','.join(item.names),
-                }
-
-        with io.StringIO(newline='') as f:
-            w = csv.DictWriter(f, fieldnames=fieldnames)
-            w.writeheader()
-            w.writerows([todict(item) for item in cutlist.sorted_items()])
-            return f.getvalue()
-
-    def _cutlisttable(self, cutlist):
-        lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
-        fieldnames = ['count', 'material', lengthkey, widthkey, heightkey, 'names']
-
-        def torow(item):
-            return [
-                item.count,
-                item.material,
-                self.format_value(item.dimensions.length),
-                self.format_value(item.dimensions.width),
-                self.format_value(item.dimensions.height),
-                '\n'.join(item.names),
-            ]
-
-        tt = Texttable(max_width=0)
-        tt.set_deco(Texttable.HEADER | Texttable.HLINES)
-        tt.header(fieldnames)
-        tt.set_cols_dtype(['i', 't', 't', 't', 't', 't'])
-        tt.set_cols_align(['r', 'l', 'r', 'r', 'r', 'l'])
-        tt.add_rows([torow(item) for item in cutlist.sorted_items()], header=False)
-        return tt.draw()
-
-
 class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
     def __init__(self):
         super().__init__()
@@ -292,10 +189,8 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
         formatInput = inputs.addDropDownCommandInput('format', 'Output Format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         formatInput.tooltip = 'The output format of the cutlist.'
-        formatInput.listItems.add('Table', preferences['format'] == TABLE, '')
-        formatInput.listItems.add('JSON', preferences['format'] == JSON, '')
-        formatInput.listItems.add('CSV', preferences['format'] == CSV, '')
-        formatInput.listItems.add('CSV (Custlist Optimizer)', preferences['format'] == CSV_CUTLISTOPTIMIZER, '')
+        for fmt in ALL_FORMATS:
+            formatInput.listItems.add(fmt.name, preferences['format'] == fmt.name, '')
 
         advancedGroup = inputs.addGroupCommandInput('advanced', 'Advanced Options')
         advancedGroup.isEnabledCheckBoxDisplayed = False
@@ -342,26 +237,19 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
         for i in range(selectionInput.selectionCount):
             cutlist.add(selectionInput.selection(i).entity)
 
-        newline = None
-        fmt = preferences['format']
-        if fmt == JSON:
-            filefilter = 'JSON Files (*.json)'
-        elif fmt in [CSV, CSV_CUTLISTOPTIMIZER]:
-            filefilter = 'CSV Files (*.csv)'
-            newline = ''
-        else:
-            filefilter = 'Text Files (*.txt)'
+        fmt_class = get_format(preferences['format'])
 
         dlg = ui.createFileDialog()
         dlg.title = 'Save Cutlist'
-        dlg.filter = filefilter
+        dlg.filter = fmt_class.filefilter
         if dlg.showSave() != adsk.core.DialogResults.DialogOK:
             return
 
         filename = dlg.filename
+        newline = '' if issubclass(fmt_class, CSVFormat) else None
         with io.open(filename, 'w', newline=newline) as f:
-            formatter = Formatter(design.unitsManager)
-            f.write(formatter.cutlist(cutlist, fmt=fmt))
+            format = fmt_class(design.unitsManager)
+            f.write(format.format(cutlist))
 
         ui.messageBox(f'Export complete: {filename}', COMMAND_NAME)
 
@@ -377,7 +265,7 @@ def set_preferences_from_inputs(inputs: adsk.core.CommandInputs):
     preferences['ignoreHidden'] = hiddenInput.value
     preferences['ignoreExternal'] = externalInput.value
     preferences['ignoreMaterial'] = materialInput.value
-    preferences['format'] = formatInput.selectedItem.name.lower()
+    preferences['format'] = formatInput.selectedItem.name
     preferences['axisAligned'] = axisAlignedInput.value
     preferences['tolerance'] = toleranceInput.value
 
