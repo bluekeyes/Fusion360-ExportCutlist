@@ -44,6 +44,8 @@ class CSVFormat(Format):
     name = 'CSV'
     filefilter = 'CSV Files (*.csv)'
 
+    dialect = 'excel'
+
     @property
     def fieldnames(self):
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
@@ -69,14 +71,18 @@ class CSVFormat(Format):
 
     def format(self, cutlist):
         with io.StringIO(newline='') as f:
-            w = csv.DictWriter(f, fieldnames=self.fieldnames)
+            w = csv.DictWriter(f, dialect=self.dialect, fieldnames=self.fieldnames)
             w.writeheader()
             w.writerows([self.item_to_dict(item) for item in cutlist.sorted_items()])
             return f.getvalue()
 
 
-class CutlistOptimizerCSVFormat(CSVFormat):
-    name = 'CSV (Cutlist Optimizer)'
+class CutlistOptimizerFormat(CSVFormat):
+    '''
+    CSV format used by https://cutlistoptimizer.com/
+    '''
+
+    name = 'Cutlist Optimizer'
 
     @property
     def fieldnames(self):
@@ -90,6 +96,34 @@ class CutlistOptimizerCSVFormat(CSVFormat):
             fields[2]: item.count,
             fields[3]: ','.join(item.names),
             fields[4]: 'true'
+        }
+
+
+class CutlistEvoFormat(CSVFormat):
+    '''
+    Tab-separated format used by https://cutlistevo.com/
+    '''
+
+    name = 'Cutlist Evo'
+    filefilter = "Text Files (*.txt)"
+
+    dialect = 'excel-tab'
+
+    @property
+    def fieldnames(self):
+        return ['Length', 'Width', 'Thickness', 'Quantity', 'Rotation', 'Name', 'Material', 'Banding']
+
+    def item_to_dict(self, item):
+        fields = self.fieldnames
+        return {
+            fields[0]: self.format_value(item.dimensions.length),
+            fields[1]: self.format_value(item.dimensions.width),
+            fields[2]: self.format_value(item.dimensions.height),
+            fields[3]: item.count,
+            fields[4]: ','.join(['L'] * item.count),
+            fields[5]: ','.join(item.names),
+            fields[6]: item.material,
+            fields[7]: ','.join(['N'] * item.count),
         }
 
 
@@ -124,10 +158,12 @@ class TableFormat(Format):
 
 ALL_FORMATS = [
     TableFormat,
-    CSVFormat,
-    CutlistOptimizerCSVFormat,
     JSONFormat,
+    CSVFormat,
+    CutlistOptimizerFormat,
+    CutlistEvoFormat,
 ]
+
 
 def get_format(name):
     for fmt in ALL_FORMATS:
