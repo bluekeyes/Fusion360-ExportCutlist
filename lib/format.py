@@ -84,10 +84,10 @@ class CSVFormat(Format):
         fields = self.fieldnames
         return {
             fields[0]: item.count,
-            fields[1]: self.format_value(item.dimensions.length),
-            fields[2]: self.format_value(item.dimensions.width),
-            fields[3]: self.format_value(item.dimensions.height),
-            fields[4]: item.material,
+            fields[1]: item.material,
+            fields[2]: self.format_value(item.dimensions.length),
+            fields[3]: self.format_value(item.dimensions.width),
+            fields[4]: self.format_value(item.dimensions.height),
             fields[5]: ','.join(item.names),
         }
 
