@@ -29,6 +29,8 @@ document structure or workflow.
 6. Selected the extracted folder from Step 2
 7. Click the "Run" button (or restart Fusion 360) to start the add-in
 
+The wiki also has a [detailed version of these steps with annotated screenshots](https://github.com/bluekeyes/Fusion360-ExportCutlist/wiki/Installation).
+
 ## Usage
 
 The "Export Cutlist" command is added to the "Make" panel:
