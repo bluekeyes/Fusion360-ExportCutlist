@@ -6,6 +6,7 @@ import io
 import traceback
 
 from operator import attrgetter
+from collections import namedtuple
 
 import adsk.core
 import adsk.fusion
@@ -14,11 +15,14 @@ from .lib.format import ALL_FORMATS, TableFormat, CSVFormat, get_format
 from .lib.geometry.bodies import MinimalBody, get_minimal_body
 
 
+GroupBy = namedtuple('GroupBy', ['dimensions', 'material'])
+
+
 COMMAND_ID = 'ExportCutlistCommand'
 COMMAND_NAME = 'Export Cutlist'
 
 DEFAULT_TOLERANCE = 1e-04
-
+DEFAULT_GROUPBY = GroupBy(dimensions=True, material=True)
 
 # required to keep handlers in scope
 handlers = []
@@ -27,7 +31,7 @@ handlers = []
 preferences = {
     'ignoreHidden': True,
     'ignoreExternal': False,
-    'ignoreMaterial': False,
+    'groupBy': DEFAULT_GROUPBY,
     'format': TableFormat.name,
     'axisAligned': False,
     'tolerance': DEFAULT_TOLERANCE,
@@ -79,23 +83,34 @@ class CutListItem:
     def count(self):
         return len(self.names)
 
-    def matches(self, other, ignorematerial=False):
+    def matches(self, other, group: GroupBy):
         if isinstance(other, CutListItem):
-            return self.dimensions == other.dimensions and (ignorematerial or self.material == other.material)
+            other_dimensions = other.dimensions
+            other_material = other.material
         elif isinstance(other, MinimalBody):
-            return self.dimensions == Dimensions.from_body(other) and (ignorematerial or self.material == other.material.name)
+            other_dimensions = Dimensions.from_body(other)
+            other_material = other.material.name
         else:
             return False
+
+        if group.dimensions:
+            if self.dimensions != other_dimensions:
+                return False
+            if group.material and self.material != other_material:
+                return False
+            return True
+
+        return False
 
     def add_instance(self, name):
         self.names.append(name)
 
 
 class CutList:
-    def __init__(self, ignorehidden=False, ignorematerial=False, ignoreexternal=False, axisaligned=False, namesep='/'):
-        self.items = []
+    def __init__(self, group: GroupBy, ignorehidden=False, ignoreexternal=False, axisaligned=False, namesep='/'):
+        self.items: list[CutListItem] = []
+        self.group = group
         self.ignorehidden = ignorehidden
-        self.ignorematerial = ignorematerial
         self.ignoreexternal = ignoreexternal
         self.axisaligned = axisaligned
         self.namesep = namesep
@@ -114,7 +129,7 @@ class CutList:
 
         added = False
         for item in self.items:
-            if item.matches(minimal_body, ignorematerial=self.ignorematerial):
+            if item.matches(minimal_body, self.group):
                 item.add_instance(name)
                 added = True
                 break
@@ -184,13 +199,22 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         externalInput = inputs.addBoolValueInput('external', 'Ignore external', True, '', preferences['ignoreExternal'])
         externalInput.tooltip = 'If checked, external components are excluded from the cutlist.'
 
-        materialInput = inputs.addBoolValueInput('material', 'Ignore materials', True, '', preferences['ignoreMaterial'])
-        materialInput.tooltip = 'If checked, bodies with different materials will match if they have the same dimensions.'
-
-        formatInput = inputs.addDropDownCommandInput('format', 'Output Format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+        formatInput = inputs.addDropDownCommandInput('format', 'Output format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         formatInput.tooltip = 'The output format of the cutlist.'
         for fmt in ALL_FORMATS:
             formatInput.listItems.add(fmt.name, preferences['format'] == fmt.name, '')
+
+        groupingGroup = inputs.addGroupCommandInput('grouping', 'Group By')
+        groupingGroup.isEnabledCheckBoxDisplayed = False
+        groupingGroup.isExpanded = True
+
+        dimensionsInput = groupingGroup.children.addBoolValueInput('group_dimensions', 'Dimensions', True, '', preferences['groupBy'].dimensions)
+        dimensionsInput.tooltip = 'If checked, group bodies by their dimensions.'
+
+        materialInput = groupingGroup.children.addBoolValueInput('group_material', 'Material', True, '', preferences['groupBy'].material)
+        materialInput.tooltip = 'If checked, group bodies by their material.'
+        materialInput.tooltipDescription = 'This option is only used when also grouping bodies by their dimensions.'
+        materialInput.isEnabled = dimensionsInput.value
 
         advancedGroup = inputs.addGroupCommandInput('advanced', 'Advanced Options')
         advancedGroup.isEnabledCheckBoxDisplayed = False
@@ -198,7 +222,7 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
         axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', preferences['axisAligned'])
         axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
-        axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z.'
+        axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z axes.'
 
         toleranceInput = advancedGroup.children.addValueInput('tolerance', 'Tolerance', 'mm', adsk.core.ValueInput.createByReal(preferences['tolerance']))
         toleranceInput.tooltip = 'The tolerance used when matching bounding box dimensions.'
@@ -206,6 +230,24 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         onExecute = CutlistCommandExecuteHandler()
         cmd.execute.add(onExecute)
         handlers.append(onExecute)
+
+        onInputChanged = CutlistCommandInputChangedHandler()
+        cmd.inputChanged.add(onInputChanged)
+        handlers.append(onInputChanged)
+
+
+class CutlistCommandInputChangedHandler(adsk.core.InputChangedEventHandler):
+    def __init__(self):
+        super().__init__()
+
+    def notify(self, args):
+        eventArgs = adsk.core.InputChangedEventArgs.cast(args)
+
+        changedInput = eventArgs.input
+        if changedInput.id == 'group_dimensions':
+            inputs = eventArgs.firingEvent.sender.commandInputs
+            materialInput = inputs.itemById('group_material')
+            materialInput.isEnabled = changedInput.value
 
 
 class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
@@ -228,8 +270,8 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
             Dimensions.tolerance = preferences['tolerance']
 
         cutlist = CutList(
+            preferences['groupBy'],
             ignorehidden=preferences['ignoreHidden'],
-            ignorematerial=preferences['ignoreMaterial'],
             ignoreexternal=preferences['ignoreExternal'],
             axisaligned=preferences['axisAligned'],
         )
@@ -259,14 +301,17 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 def set_preferences_from_inputs(inputs: adsk.core.CommandInputs):
     hiddenInput: adsk.core.BoolValueCommandInput = inputs.itemById('hidden')
     externalInput: adsk.core.BoolValueCommandInput = inputs.itemById('external')
-    materialInput: adsk.core.BoolValueCommandInput = inputs.itemById('material')
     formatInput: adsk.core.DropDownCommandInput = inputs.itemById('format')
     axisAlignedInput: adsk.core.BoolValueCommandInput = inputs.itemById('axisaligned')
     toleranceInput: adsk.core.ValueCommandInput = inputs.itemById('tolerance')
 
+    dimensionsInput: adsk.core.BoolValueCommandInput = inputs.itemById('group_dimensions')
+    materialInput: adsk.core.BoolValueCommandInput = inputs.itemById('group_material')
+    group = GroupBy(dimensions=dimensionsInput.value, material=materialInput.value)
+
     preferences['ignoreHidden'] = hiddenInput.value
     preferences['ignoreExternal'] = externalInput.value
-    preferences['ignoreMaterial'] = materialInput.value
+    preferences['groupBy'] = group
     preferences['format'] = formatInput.selectedItem.name
     preferences['axisAligned'] = axisAlignedInput.value
     preferences['tolerance'] = toleranceInput.value
