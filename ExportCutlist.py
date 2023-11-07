@@ -292,7 +292,7 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 
         filename = dlg.filename
         newline = '' if isinstance(fmt, CSVFormat) else None
-        with io.open(filename, 'w', newline=newline) as f:
+        with io.open(filename, 'w', newline=newline, encoding='utf-8') as f:
             f.write(fmt.format(cutlist))
 
         ui.messageBox(f'Export complete: {filename}', COMMAND_NAME)
