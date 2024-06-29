@@ -4,6 +4,8 @@ import io
 import json
 import textwrap
 import typing
+import re
+from fractions import Fraction
 
 import adsk.core
 
@@ -24,10 +26,11 @@ class Format:
     name = 'Base Format'
     filefilter = FileFilter('Text Files', 'txt')
 
-    def __init__(self, unitsMgr: adsk.core.UnitsManager, docname: str, units=None):
+    def __init__(self, unitsMgr: adsk.core.UnitsManager, docname: str, units=None, fractions=False):
         self.unitsMgr = unitsMgr
         self.docname = docname
         self.units = units if units else unitsMgr.defaultLengthUnits
+        self.fractions = fractions
 
     @property
     def filename(self):
@@ -35,7 +38,32 @@ class Format:
         return f'{name}.{self.filefilter.ext}'
 
     def format_value(self, value, showunits=False):
-        return self.unitsMgr.formatInternalValue(value, self.units, showunits)
+        result = self.unitsMgr.formatInternalValue(value, self.units, showunits)
+
+        if not self.fractions:
+          return result
+
+        match = re.match("(\d+)(\.\d+)?( (?:in|cm|mm))?", result)
+        if match is not None:
+          integerValue = match.group(1)
+          decimalValue = match.group(2)
+          unit = match.group(3)
+          if unit is None:
+            unit = ""
+
+          decimalDisplay = decimalValue
+          if decimalValue:
+            fraction = Fraction(decimalValue)
+            if fraction.numerator == 0:
+              decimalDisplay = ''
+            elif fraction.denominator.bit_count() == 1:
+              decimalDisplay = ' %d/%d' % (fraction.numerator, fraction.denominator)
+              if integerValue == '0':
+                integerValue = ''
+
+          return integerValue + decimalDisplay + unit
+        else:
+          return result
 
     def format(self, cutlist):
         raise NotImplementedError

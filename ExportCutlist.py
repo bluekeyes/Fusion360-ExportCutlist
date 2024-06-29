@@ -33,6 +33,7 @@ preferences = {
     'ignoreExternal': False,
     'groupBy': DEFAULT_GROUPBY,
     'format': TableFormat.name,
+    'fractions': False,
     'axisAligned': False,
     'tolerance': DEFAULT_TOLERANCE,
 }
@@ -144,7 +145,7 @@ class CutList:
 
         elif isinstance(obj, adsk.fusion.Occurrence):
             if obj.isReferencedComponent and self.ignoreexternal:
-                return 
+                return
             for body in obj.bRepBodies:
                 self.add_body(body, self._joinname(name, obj.component.name, body.name))
             for child in obj.childOccurrences:
@@ -220,6 +221,9 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         advancedGroup.isEnabledCheckBoxDisplayed = False
         advancedGroup.isExpanded = False
 
+        fractionInput = advancedGroup.children.addBoolValueInput('fraction', 'Output fractions', True, '', preferences['fractions'])
+        fractionInput.tooltip = 'If checked, output dimensions will be displayed as fractions instead of decimals'
+
         axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', preferences['axisAligned'])
         axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
         axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z axes.'
@@ -281,7 +285,7 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
             cutlist.add(selectionInput.selection(i).entity)
 
         fmt_class = get_format(preferences['format'])
-        fmt = fmt_class(design.unitsManager, doc.name)
+        fmt = fmt_class(design.unitsManager, doc.name, fractions=preferences['fractions'])
 
         dlg = ui.createFileDialog()
         dlg.title = 'Save Cutlist'
@@ -304,6 +308,7 @@ def set_preferences_from_inputs(inputs: adsk.core.CommandInputs):
     formatInput: adsk.core.DropDownCommandInput = inputs.itemById('format')
     axisAlignedInput: adsk.core.BoolValueCommandInput = inputs.itemById('axisaligned')
     toleranceInput: adsk.core.ValueCommandInput = inputs.itemById('tolerance')
+    fractionInput: adsk.core.BoolValueCommandInput = inputs.itemById('fraction')
 
     dimensionsInput: adsk.core.BoolValueCommandInput = inputs.itemById('group_dimensions')
     materialInput: adsk.core.BoolValueCommandInput = inputs.itemById('group_material')
@@ -315,7 +320,7 @@ def set_preferences_from_inputs(inputs: adsk.core.CommandInputs):
     preferences['format'] = formatInput.selectedItem.name
     preferences['axisAligned'] = axisAlignedInput.value
     preferences['tolerance'] = toleranceInput.value
-
+    preferences['fractions'] = fractionInput.value
 
 @report_errors
 def run(context):
