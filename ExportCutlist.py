@@ -150,7 +150,7 @@ class CutList:
 
         elif isinstance(obj, adsk.fusion.Occurrence):
             if obj.isReferencedComponent and self.ignoreexternal:
-                return 
+                return
             for body in obj.bRepBodies:
                 self.add_body(body, self._joinname(name, obj.component.name, body.name))
             for child in obj.childOccurrences:
@@ -228,9 +228,8 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
         unitInput = advancedGroup.children.addDropDownCommandInput('unit', 'Output unit', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         unitInput.tooltip = 'Units for output dimensions'
-        for fmt in ALL_UNITS:
-            formatInput.listItems.add(fmt, preferences['unit'] == fmt, '')
-            unitInput.listItems.add(fmt, preferences['unit'] == fmt, '')
+        for unit in ALL_UNITS:
+            unitInput.listItems.add(unit, preferences['unit'] == unit, '')
 
         axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', preferences['axisAligned'])
         axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
@@ -328,7 +327,6 @@ def set_preferences_from_inputs(inputs: adsk.core.CommandInputs):
     preferences['format'] = formatInput.selectedItem.name
     preferences['axisAligned'] = axisAlignedInput.value
     preferences['tolerance'] = toleranceInput.value
-    preferences['unit'] = unitInput.value
     preferences['unit'] = unitInput.selectedItem.name
 
 @report_errors
