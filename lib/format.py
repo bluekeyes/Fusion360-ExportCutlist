@@ -27,7 +27,7 @@ class Format:
     def __init__(self, unitsMgr: adsk.core.UnitsManager, docname: str, units=None):
         self.unitsMgr = unitsMgr
         self.docname = docname
-        self.units = units if units else unitsMgr.defaultLengthUnits
+        self.units = units if (units and units != 'auto') else unitsMgr.defaultLengthUnits
 
     @property
     def filename(self):
