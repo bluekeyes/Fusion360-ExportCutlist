@@ -26,7 +26,7 @@ DEFAULT_GROUPBY = GroupBy(dimensions=True, material=True)
 DEFAULT_UNIT = 'auto'
 
 ALL_UNITS = [
-  'auto', 'in', 'mm'
+  'auto', 'in', 'ft', 'mm', 'cm', 'm'
 ]
 
 # required to keep handlers in scope
