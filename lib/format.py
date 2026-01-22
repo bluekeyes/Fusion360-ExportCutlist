@@ -2,6 +2,7 @@ import csv
 import html
 import io
 import json
+import re
 import textwrap
 import typing
 
@@ -108,19 +109,33 @@ class CutlistOptimizerFormat(CSVFormat):
 
     @property
     def fieldnames(self):
-        return ['Length', 'Width', 'Qty', 'Label', 'Enabled']
+        return ['Length', 'Width', 'Qty', 'Material', 'Label', 'Enabled']
+
+    def _short_label(self, name):
+        '''Extract the component name (second-to-last path segment) from a full body path,
+        and normalize by removing trailing numbers like " 6" or " (1)".'''
+        parts = name.split('/')
+        label = parts[-2] if len(parts) >= 2 else (parts[-1] if parts else name)
+        # Remove trailing " (1)" style suffixes
+        label = re.sub(r'\s*\(\d+\)\s*$', '', label)
+        # Remove trailing " 6" style suffixes
+        label = re.sub(r'\s+\d+\s*$', '', label)
+        return label
 
     def item_to_dict(self, item):
         # Note that CutlistOptimizer uses str.split to 'parse' the fields in each record. Import will
         # fail when fields contain the delimiter. Use semicolon to separate the names and remove all
         # delimiters from str values.
         fields = self.fieldnames
+        # Deduplicate short labels while preserving order
+        short_labels = list(dict.fromkeys(self._short_label(n) for n in item.names))
         return {
             fields[0]: self.format_value(item.dimensions.length),
             fields[1]: self.format_value(item.dimensions.width),
             fields[2]: item.count,
-            fields[3]: ';'.join(item.names).replace(',', ''),
-            fields[4]: 'true'
+            fields[3]: item.material.replace(',', ''),
+            fields[4]: ';'.join(short_labels).replace(',', ''),
+            fields[5]: 'true'
         }
 
 
