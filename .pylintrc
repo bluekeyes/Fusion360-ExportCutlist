@@ -1,11 +1,12 @@
 [MAIN]
 
-ignore = texttable.py 
+ignore = texttable.py
 
 ignored-modules = adsk
 
-disable = missing-module-docstring,
-          missing-function-docstring,
-          missing-class-docstring,
+disable = fixme,
           line-too-long,
-          fixme
+          missing-class-docstring,
+          missing-function-docstring,
+          too-few-public-methods,
+          missing-module-docstring
