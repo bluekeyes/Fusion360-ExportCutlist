@@ -51,13 +51,18 @@ preferences = {
 }
 
 def report_errors(func):
+    """Decorator that catches any exception thrown by the function and displays it in the UI.
+
+    For use only on top-level functions called by Fusion that do not return values.
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            return func(*args, **kwargs)
-        except:
+            func(*args, **kwargs)
+        except: # pylint: disable=bare-except
             app = adsk.core.Application.get()
-            app.userInterface.messageBox('Failed:\n{}'.format(traceback.format_exc()))
+            app.userInterface.messageBox(f'Failed:\n{traceback.format_exc()}')
+
     return wrapper
 
 
@@ -193,7 +198,7 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
         if not design:
             app.userInterface.messageBox('A design must be active for this command.', COMMAND_NAME)
-            return False
+            return
 
         eventArgs = adsk.core.CommandCreatedEventArgs.cast(args)
         cmd = eventArgs.command
