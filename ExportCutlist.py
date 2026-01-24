@@ -66,7 +66,7 @@ class Dimensions:
 
     @classmethod
     def from_body(cls, body: MinimalBody):
-        bbox = body.boundingBox
+        bbox = body.bounding_box
         x = bbox.maxPoint.x - bbox.minPoint.x
         y = bbox.maxPoint.y - bbox.minPoint.y
         z = bbox.maxPoint.z - bbox.minPoint.z

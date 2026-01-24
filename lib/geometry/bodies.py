@@ -16,7 +16,7 @@ class MinimalBody:
         return self.body.material
 
     @property
-    def boundingBox(self) -> adsk.core.BoundingBox3D:
+    def bounding_box(self) -> adsk.core.BoundingBox3D:
         return self.bbox
 
 
@@ -49,7 +49,7 @@ def get_minimal_body(body: adsk.fusion.BRepBody) -> MinimalBody:
     min_body = brep_manager.copy(body)
     brep_manager.transform(min_body, transform)
 
-    return MinimalBody(body, min_body.boundingBox)
+    return MinimalBody(body, min_body.bounding_box)
 
 
 # Returns the planar face with the largest perimeter in body or None if no
