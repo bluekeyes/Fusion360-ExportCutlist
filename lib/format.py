@@ -24,10 +24,10 @@ class Format:
     name = 'Base Format'
     filefilter = FileFilter('Text Files', 'txt')
 
-    def __init__(self, unitsMgr: adsk.core.UnitsManager, docname: str, units=None):
-        self.unitsMgr = unitsMgr
+    def __init__(self, units_manager: adsk.core.UnitsManager, docname: str, units=None):
+        self.units_manager = units_manager
         self.docname = docname
-        self.units = units if (units and units != 'auto') else unitsMgr.defaultLengthUnits
+        self.units = units if (units and units != 'auto') else units_manager.defaultLengthUnits
 
     @property
     def filename(self):
@@ -35,7 +35,7 @@ class Format:
         return f'{name}.{self.filefilter.ext}'
 
     def format_value(self, value, showunits=False):
-        return self.unitsMgr.formatInternalValue(value, self.units, showunits)
+        return self.units_manager.formatInternalValue(value, self.units, showunits)
 
     def format(self, cutlist):
         raise NotImplementedError
