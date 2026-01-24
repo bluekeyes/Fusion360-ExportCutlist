@@ -49,7 +49,7 @@ def get_minimal_body(body: adsk.fusion.BRepBody) -> MinimalBody:
     min_body = brep_manager.copy(body)
     brep_manager.transform(min_body, transform)
 
-    return MinimalBody(body, min_body.bounding_box)
+    return MinimalBody(body, min_body.boundingBox)
 
 
 # Returns the planar face with the largest perimeter in body or None if no
