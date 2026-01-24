@@ -209,80 +209,80 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
             app.userInterface.messageBox('A design must be active for this command.', COMMAND_NAME)
             return
 
-        eventArgs = adsk.core.CommandCreatedEventArgs.cast(args)
-        cmd = eventArgs.command
+        event_args = adsk.core.CommandCreatedEventArgs.cast(args)
+        cmd = event_args.command
         inputs = cmd.commandInputs
 
-        selectInput = inputs.addSelectionInput('selection', 'Selection', 'Select body or component')
-        selectInput.tooltip = 'Select bodies or components to export.'
-        selectInput.addSelectionFilter('SolidBodies')
-        selectInput.addSelectionFilter('Occurrences')
-        selectInput.setSelectionLimits(0)
+        select_input = inputs.addSelectionInput('selection', 'Selection', 'Select body or component')
+        select_input.tooltip = 'Select bodies or components to export.'
+        select_input.addSelectionFilter('SolidBodies')
+        select_input.addSelectionFilter('Occurrences')
+        select_input.setSelectionLimits(0)
 
-        hiddenInput = inputs.addBoolValueInput('hidden', 'Ignore hidden', True, '', user_options.ignore_hidden)
-        hiddenInput.tooltip = 'If checked, hidden bodies are excluded from the cutlist.'
+        hidden_input = inputs.addBoolValueInput('hidden', 'Ignore hidden', True, '', user_options.ignore_hidden)
+        hidden_input.tooltip = 'If checked, hidden bodies are excluded from the cutlist.'
 
-        externalInput = inputs.addBoolValueInput('external', 'Ignore external', True, '', user_options.ignore_external)
-        externalInput.tooltip = 'If checked, external components are excluded from the cutlist.'
+        external_input = inputs.addBoolValueInput('external', 'Ignore external', True, '', user_options.ignore_external)
+        external_input.tooltip = 'If checked, external components are excluded from the cutlist.'
 
-        formatInput = inputs.addDropDownCommandInput('format', 'Output format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
-        formatInput.tooltip = 'The output format of the cutlist.'
+        format_input = inputs.addDropDownCommandInput('format', 'Output format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+        format_input.tooltip = 'The output format of the cutlist.'
         for fmt in ALL_FORMATS:
-            formatInput.listItems.add(fmt.name, user_options.format == fmt.name, '')
+            format_input.listItems.add(fmt.name, user_options.format == fmt.name, '')
 
-        groupingGroup = inputs.addGroupCommandInput('grouping', 'Group By')
-        groupingGroup.isEnabledCheckBoxDisplayed = False
-        groupingGroup.isExpanded = True
+        grouping_group = inputs.addGroupCommandInput('grouping', 'Group By')
+        grouping_group.isEnabledCheckBoxDisplayed = False
+        grouping_group.isExpanded = True
 
-        dimensionsInput = groupingGroup.children.addBoolValueInput('group_dimensions', 'Dimensions', True, '', user_options.group_by.dimensions)
-        dimensionsInput.tooltip = 'If checked, group bodies by their dimensions.'
+        dimensions_input = grouping_group.children.addBoolValueInput('group_dimensions', 'Dimensions', True, '', user_options.group_by.dimensions)
+        dimensions_input.tooltip = 'If checked, group bodies by their dimensions.'
 
-        materialInput = groupingGroup.children.addBoolValueInput('group_material', 'Material', True, '', user_options.group_by.material)
-        materialInput.tooltip = 'If checked, group bodies by their material.'
-        materialInput.tooltipDescription = 'This option is only used when also grouping bodies by their dimensions.'
-        materialInput.isEnabled = dimensionsInput.value
+        material_input = grouping_group.children.addBoolValueInput('group_material', 'Material', True, '', user_options.group_by.material)
+        material_input.tooltip = 'If checked, group bodies by their material.'
+        material_input.tooltipDescription = 'This option is only used when also grouping bodies by their dimensions.'
+        material_input.isEnabled = dimensions_input.value
 
-        advancedGroup = inputs.addGroupCommandInput('advanced', 'Advanced Options')
-        advancedGroup.isEnabledCheckBoxDisplayed = False
-        advancedGroup.isExpanded = False
+        advanced_group = inputs.addGroupCommandInput('advanced', 'Advanced Options')
+        advanced_group.isEnabledCheckBoxDisplayed = False
+        advanced_group.isExpanded = False
 
-        unitInput = advancedGroup.children.addDropDownCommandInput('unit', 'Output unit', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
-        unitInput.tooltip = 'Units for output dimensions'
+        unit_input = advanced_group.children.addDropDownCommandInput('unit', 'Output unit', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+        unit_input.tooltip = 'Units for output dimensions'
         for unit in ALL_UNITS:
-            unitInput.listItems.add(unit, user_options.unit == unit, '')
+            unit_input.listItems.add(unit, user_options.unit == unit, '')
 
-        axisAlignedInput = advancedGroup.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', user_options.axis_aligned)
-        axisAlignedInput.tooltip = 'If checked, use axis-algined bounding boxes.'
-        axisAlignedInput.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z axes.'
+        axis_aligned_input = advanced_group.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', user_options.axis_aligned)
+        axis_aligned_input.tooltip = 'If checked, use axis-algined bounding boxes.'
+        axis_aligned_input.tooltipDescription = 'This disables the rotation heuristic and assumes parts are already in the ideal orientation relative to the X, Y, and Z axes.'
 
-        toleranceInput = advancedGroup.children.addValueInput('tolerance', 'Tolerance', 'mm', adsk.core.ValueInput.createByReal(user_options.tolerance))
-        toleranceInput.tooltip = 'The tolerance used when matching bounding box dimensions.'
+        tolerance_input = advanced_group.children.addValueInput('tolerance', 'Tolerance', 'mm', adsk.core.ValueInput.createByReal(user_options.tolerance))
+        tolerance_input.tooltip = 'The tolerance used when matching bounding box dimensions.'
 
-        onExecute = CutlistCommandExecuteHandler()
-        cmd.execute.add(onExecute)
-        handlers.append(onExecute)
+        execute_handler = CutlistCommandExecuteHandler()
+        cmd.execute.add(execute_handler)
+        handlers.append(execute_handler)
 
-        onInputChanged = CutlistCommandInputChangedHandler()
-        cmd.inputChanged.add(onInputChanged)
-        handlers.append(onInputChanged)
+        input_handler = CutlistCommandInputChangedHandler()
+        cmd.inputChanged.add(input_handler)
+        handlers.append(input_handler)
 
 
 class CutlistCommandInputChangedHandler(adsk.core.InputChangedEventHandler):
     def notify(self, args):
-        eventArgs = adsk.core.InputChangedEventArgs.cast(args)
+        event_args = adsk.core.InputChangedEventArgs.cast(args)
 
-        changedInput = eventArgs.input
-        if changedInput.id == 'group_dimensions':
-            inputs = eventArgs.firingEvent.sender.commandInputs
-            materialInput = inputs.itemById('group_material')
-            materialInput.isEnabled = changedInput.value
+        changed_input = event_args.input
+        if changed_input.id == 'group_dimensions':
+            inputs = event_args.firingEvent.sender.commandInputs
+            material_input = inputs.itemById('group_material')
+            material_input.isEnabled = changed_input.value
 
 
 class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
     @report_errors
     def notify(self, args):
-        eventArgs = adsk.core.CommandEventArgs.cast(args)
-        inputs = eventArgs.command.commandInputs
+        event_args = adsk.core.CommandEventArgs.cast(args)
+        inputs = event_args.command.commandInputs
 
         app = adsk.core.Application.get()
         ui = app.userInterface
@@ -296,9 +296,9 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 
         cutlist = CutList(user_options)
 
-        selectionInput = inputs.itemById('selection')
-        for i in range(selectionInput.selectionCount):
-            cutlist.add(selectionInput.selection(i).entity)
+        selection_input = inputs.itemById('selection')
+        for i in range(selection_input.selectionCount):
+            cutlist.add(selection_input.selection(i).entity)
 
         fmt_class = get_format(user_options.format)
         fmt = fmt_class(design.unitsManager, doc.name, units=user_options.unit)
@@ -319,24 +319,24 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 
 
 def set_options_from_inputs(inputs: adsk.core.CommandInputs):
-    hiddenInput: adsk.core.BoolValueCommandInput = inputs.itemById('hidden')
-    externalInput: adsk.core.BoolValueCommandInput = inputs.itemById('external')
-    formatInput: adsk.core.DropDownCommandInput = inputs.itemById('format')
-    axisAlignedInput: adsk.core.BoolValueCommandInput = inputs.itemById('axisaligned')
-    toleranceInput: adsk.core.ValueCommandInput = inputs.itemById('tolerance')
-    unitInput: adsk.core.DropDownCommandInput = inputs.itemById('unit')
+    hidden_input: adsk.core.BoolValueCommandInput = inputs.itemById('hidden')
+    external_input: adsk.core.BoolValueCommandInput = inputs.itemById('external')
+    format_input: adsk.core.DropDownCommandInput = inputs.itemById('format')
+    axis_aligned_input: adsk.core.BoolValueCommandInput = inputs.itemById('axisaligned')
+    tolerance_input: adsk.core.ValueCommandInput = inputs.itemById('tolerance')
+    unit_input: adsk.core.DropDownCommandInput = inputs.itemById('unit')
 
-    dimensionsInput: adsk.core.BoolValueCommandInput = inputs.itemById('group_dimensions')
-    materialInput: adsk.core.BoolValueCommandInput = inputs.itemById('group_material')
-    group_by = GroupBy(dimensions=dimensionsInput.value, material=materialInput.value)
+    dimensions_input: adsk.core.BoolValueCommandInput = inputs.itemById('group_dimensions')
+    material_input: adsk.core.BoolValueCommandInput = inputs.itemById('group_material')
+    group_by = GroupBy(dimensions=dimensions_input.value, material=material_input.value)
 
-    user_options.ignore_hidden = hiddenInput.value
-    user_options.ignore_external = externalInput.value
+    user_options.ignore_hidden = hidden_input.value
+    user_options.ignore_external = external_input.value
     user_options.group_by = group_by
-    user_options.format = formatInput.selectedItem.name
-    user_options.axis_aligned = axisAlignedInput.value
-    user_options.tolerance = toleranceInput.value
-    user_options.unit = unitInput.selectedItem.name
+    user_options.format = format_input.selectedItem.name
+    user_options.axis_aligned = axis_aligned_input.value
+    user_options.tolerance = tolerance_input.value
+    user_options.unit = unit_input.selectedItem.name
 
 
 @report_errors
@@ -344,17 +344,17 @@ def run(_context: dict):
     app = adsk.core.Application.get()
     ui = app.userInterface
 
-    cmdDef = ui.commandDefinitions.addButtonDefinition(
+    cmd = ui.commandDefinitions.addButtonDefinition(
         COMMAND_ID, COMMAND_NAME,
         'Export a cutlist file for the bodies in selected components',
         './/resources')
 
-    onCreate = CutlistCommandCreatedEventHandler()
-    cmdDef.commandCreated.add(onCreate)
-    handlers.append(onCreate)
+    create_handler = CutlistCommandCreatedEventHandler()
+    cmd.commandCreated.add(create_handler)
+    handlers.append(create_handler)
 
-    makePanel = ui.allToolbarPanels.itemById('MakePanel')
-    makePanel.controls.addCommand(cmdDef)
+    panel = ui.allToolbarPanels.itemById('MakePanel')
+    panel.controls.addCommand(cmd)
 
 
 @report_errors
@@ -362,11 +362,11 @@ def stop(_context: dict):
     app = adsk.core.Application.get()
     ui = app.userInterface
 
-    cmdDef = ui.commandDefinitions.itemById(COMMAND_ID)
-    if cmdDef:
-        cmdDef.deleteMe()
+    cmd = ui.commandDefinitions.itemById(COMMAND_ID)
+    if cmd:
+        cmd.deleteMe()
 
-    makePanel = ui.allToolbarPanels.itemById('MakePanel')
-    button = makePanel.controls.itemById(COMMAND_ID)
+    panel = ui.allToolbarPanels.itemById('MakePanel')
+    button = panel.controls.itemById(COMMAND_ID)
     if button:
         button.deleteMe()
