@@ -184,9 +184,6 @@ class CutList:
 
 
 class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
-    def __init__(self):
-        super().__init__()
-
     @report_errors
     def notify(self, args):
         # pylint: disable=too-many-locals
@@ -257,9 +254,6 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
 
 class CutlistCommandInputChangedHandler(adsk.core.InputChangedEventHandler):
-    def __init__(self):
-        super().__init__()
-
     def notify(self, args):
         eventArgs = adsk.core.InputChangedEventArgs.cast(args)
 
@@ -271,9 +265,6 @@ class CutlistCommandInputChangedHandler(adsk.core.InputChangedEventHandler):
 
 
 class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
-    def __init__(self):
-        super().__init__()
-
     @report_errors
     def notify(self, args):
         # pylint: disable=too-many-locals
