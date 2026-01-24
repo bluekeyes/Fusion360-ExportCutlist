@@ -1,6 +1,13 @@
 #Author-Billy Keyes
 #Description-Export a cut list of all bodies as a JSON file
 
+# Fusion addins by convention use CamelCase for the root module name. Disable
+# the invalid-name check only for the module name, then re-enable it for the
+# names within the module.
+#
+# pylint: disable=invalid-name
+# pylint: enable=invalid-name
+
 import functools
 import io
 import traceback
