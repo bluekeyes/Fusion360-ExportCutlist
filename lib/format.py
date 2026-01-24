@@ -27,7 +27,7 @@ class Format:
     def __init__(self, unitsMgr: adsk.core.UnitsManager, docname: str, units=None):
         self.unitsMgr = unitsMgr
         self.docname = docname
-        self.units = units if units else unitsMgr.defaultLengthUnits
+        self.units = units if (units and units != 'auto') else unitsMgr.defaultLengthUnits
 
     @property
     def filename(self):
@@ -84,10 +84,10 @@ class CSVFormat(Format):
         fields = self.fieldnames
         return {
             fields[0]: item.count,
-            fields[1]: self.format_value(item.dimensions.length),
-            fields[2]: self.format_value(item.dimensions.width),
-            fields[3]: self.format_value(item.dimensions.height),
-            fields[4]: item.material,
+            fields[1]: item.material,
+            fields[2]: self.format_value(item.dimensions.length),
+            fields[3]: self.format_value(item.dimensions.width),
+            fields[4]: self.format_value(item.dimensions.height),
             fields[5]: ','.join(item.names),
         }
 
@@ -111,12 +111,15 @@ class CutlistOptimizerFormat(CSVFormat):
         return ['Length', 'Width', 'Qty', 'Label', 'Enabled']
 
     def item_to_dict(self, item):
+        # Note that CutlistOptimizer uses str.split to 'parse' the fields in each record. Import will
+        # fail when fields contain the delimiter. Use semicolon to separate the names and remove all
+        # delimiters from str values.
         fields = self.fieldnames
         return {
             fields[0]: self.format_value(item.dimensions.length),
             fields[1]: self.format_value(item.dimensions.width),
             fields[2]: item.count,
-            fields[3]: ','.join(item.names),
+            fields[3]: ';'.join(item.names).replace(',', ''),
             fields[4]: 'true'
         }
 

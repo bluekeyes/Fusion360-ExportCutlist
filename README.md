@@ -15,17 +15,21 @@ document structure or workflow.
 - Groups parts by matching bounding box dimensions and materials
   - The largest dimension is called `length`, the next largest `width`, and the smallest `height`
   - Accounts for [part rotation](#matching-rotation) when matching bounding boxes
-  - Material matching can be disabled
+  - Customize grouping conditions
 - Exports to text, HTML, JSON, CSV, and more
 - Additional filtering options for bodies (e.g. visibility)
 
 ## Installation
 
-1. Download the [latest release](https://github.com/bluekeyes/Fusion360-ExportCutlist/archive/v0.4.0.zip)
+1. Download the [latest release](https://github.com/bluekeyes/Fusion360-ExportCutlist/archive/v0.5.3.zip)
 2. Unzip the file on your computer
 3. Start Fusion360 and open the "Scripts & Addins" dialog (Shift+S)
-4. Go to the "Addins" tab
-5. Click the green "+" sign and browse to the folder where you extracted the addin
+4. Go to the "Add-Ins" tab
+5. Click the green "+" (plus) sign next to "My Add-Ins"
+6. Selected the extracted folder from Step 2
+7. Click the "Run" button (or restart Fusion 360) to start the add-in
+
+The wiki also has a [detailed version of these steps with annotated screenshots](https://github.com/bluekeyes/Fusion360-ExportCutlist/wiki/Installation).
 
 ## Usage
 

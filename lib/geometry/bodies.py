@@ -21,6 +21,11 @@ class MinimalBody:
 
 
 def get_minimal_body(body: adsk.fusion.BRepBody) -> MinimalBody:
+    origin = adsk.core.Point3D.create()
+    target_x = adsk.core.Vector3D.create(x=1)
+    target_y = adsk.core.Vector3D.create(y=1)
+    target_z = adsk.core.Vector3D.create(z=1)
+
     face = find_largest_planar_face(body)
     if face is None:
         return MinimalBody(body)
@@ -35,11 +40,6 @@ def get_minimal_body(body: adsk.fusion.BRepBody) -> MinimalBody:
 
     cross_orientation = orientation.crossProduct(normal)
     cross_orientation.normalize()
-
-    origin = adsk.core.Point3D.create()
-    target_x = adsk.core.Vector3D.create(x=1)
-    target_y = adsk.core.Vector3D.create(y=1)
-    target_z = adsk.core.Vector3D.create(z=1)
 
     transform = adsk.core.Matrix3D.create()
     transform.setToAlignCoordinateSystems(origin, orientation, cross_orientation, normal, origin, target_x, target_y, target_z)
