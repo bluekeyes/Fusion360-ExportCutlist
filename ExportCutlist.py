@@ -332,7 +332,7 @@ def set_preferences_from_inputs(inputs: adsk.core.CommandInputs):
     preferences['unit'] = unitInput.selectedItem.name
 
 @report_errors
-def run(context):
+def run(_context: dict):
     app = adsk.core.Application.get()
     ui = app.userInterface
 
@@ -350,7 +350,7 @@ def run(context):
 
 
 @report_errors
-def stop(context):
+def stop(_context: dict):
     app = adsk.core.Application.get()
     ui = app.userInterface
 
