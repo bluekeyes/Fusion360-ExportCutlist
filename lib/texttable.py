@@ -1,5 +1,5 @@
-# texttable - module for creating simple ASCII tables
-# Copyright (C) 2003-2019 Gerome Fournier <jef(at)foutaise.org>
+# texttable - module to create simple ASCII tables
+# Copyright (C) 2003-2023 Gerome Fournier <jef(at)foutaise.org>
 #
 # The MIT License (MIT)
 #
@@ -9,10 +9,10 @@
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -21,11 +21,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
-# ----
-# Copied from https://github.com/foutaise/texttable at commit dc8ab1b7 without
-# modification (except for this comment) for easier use in the Fusion 360 addin.
+# ---
+#
+# Version 1.7.0 copied from https://github.com/foutaise/texttable without
+# modification (except for this comment) for use in the addin.
 
-"""module for creating simple ASCII tables
+"""module to create simple ASCII tables
 
 
 Example:
@@ -37,7 +38,8 @@ Example:
                     ["Mr\\nXavier\\nHuon", 32, "Xav'"],
                     ["Mr\\nBaptiste\\nClement", 1, "Baby"],
                     ["Mme\\nLouise\\nBourgeau", 28, "Lou\\n\\nLoue"]])
-    print table.draw() + "\\n"
+    print(table.draw())
+    print()
 
     table = Texttable()
     table.set_deco(Texttable.HEADER)
@@ -52,7 +54,7 @@ Example:
                     ["efghijk", 67.5434, .654,  89.6,  12800000000000000000000.00023],
                     ["lmn",     5e-78,   5e-78, 89.4,  .000000000000128],
                     ["opqrstu", .023,    5e+78, 92.,   12800000000000000000000]])
-    print table.draw()
+    print(table.draw())
 
 Result:
 
@@ -86,7 +88,7 @@ __all__ = ["Texttable", "ArraySizeError"]
 
 __author__ = 'Gerome Fournier <jef(at)foutaise.org>'
 __license__ = 'MIT'
-__version__ = '1.6.2'
+__version__ = '1.7.0'
 __credits__ = """\
 Jeff Kowalczyk:
     - textwrap improved import
@@ -270,7 +272,7 @@ class Texttable:
     def set_deco(self, deco):
         """Set the table decoration
 
-        - 'deco' can be a combinaison of:
+        - 'deco' can be a combination of:
 
             Texttable.BORDER: Border around the table
             Texttable.HEADER: Horizontal line below the header
@@ -285,6 +287,7 @@ class Texttable:
         """
 
         self._deco = deco
+        self._hline_string = None
         return self
 
     def set_header_align(self, array):
@@ -333,13 +336,14 @@ class Texttable:
         """Set the desired columns datatype for the cols.
 
         - the elements of the array should be either a callable or any of
-          "a", "t", "f", "e" or "i":
+          "a", "t", "f", "e", "i" or "b":
 
             * "a": automatic (try to use the most appropriate datatype)
             * "t": treat as text
             * "f": treat as float in decimal format
             * "e": treat as float in exponential format
             * "i": treat as int
+            * "b": treat as boolean
             * a callable: should return formatted string for any value given
 
         - by default, automatic datatyping is used for each column
@@ -467,10 +471,11 @@ class Texttable:
     @classmethod
     def _fmt_int(cls, x, **kw):
         """Integer formatting class-method.
-
-        - x will be float-converted and then used.
         """
-        return str(int(round(cls._to_float(x))))
+        if type(x) == int:
+            return str(x)
+        else:
+            return str(int(round(cls._to_float(x))))
 
     @classmethod
     def _fmt_float(cls, x, **kw):
@@ -502,6 +507,11 @@ class Texttable:
         return obj2unicode(x)
 
     @classmethod
+    def _fmt_bool(cls, x, **kw):
+        """Boolean formatting class-method"""
+        return str(bool(x))
+
+    @classmethod
     def _fmt_auto(cls, x, **kw):
         """auto formatting class-method."""
         f = cls._to_float(x)
@@ -510,7 +520,7 @@ class Texttable:
         elif f != f:  # NaN
             fn = cls._fmt_text
         elif f - round(f) == 0:
-            fn = cls._fmt_int
+            fn = cls._fmt_bool if isinstance(x, bool) else cls._fmt_int
         else:
             fn = cls._fmt_float
         return fn(x, **kw)
@@ -524,6 +534,7 @@ class Texttable:
         FMT = {
             'a':self._fmt_auto,
             'i':self._fmt_int,
+            'b':self._fmt_bool,
             'f':self._fmt_float,
             'e':self._fmt_exp,
             't':self._fmt_text,
@@ -747,7 +758,8 @@ if __name__ == '__main__':
                     ["Mr\nXavier\nHuon", 32, "Xav'"],
                     ["Mr\nBaptiste\nClement", 1, "Baby"],
                     ["Mme\nLouise\nBourgeau", 28, "Lou\n \nLoue"]])
-    print(table.draw() + "\n")
+    print(table.draw())
+    print()
 
     table = Texttable()
     table.set_deco(Texttable.HEADER)
