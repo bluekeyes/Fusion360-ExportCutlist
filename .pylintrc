@@ -4,9 +4,9 @@ ignore = texttable.py
 
 ignored-modules = adsk
 
-disable = fixme,
+disable = design,
+          fixme,
           line-too-long,
           missing-class-docstring,
           missing-function-docstring,
-          too-few-public-methods,
           missing-module-docstring

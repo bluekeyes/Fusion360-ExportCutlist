@@ -202,8 +202,6 @@ class CutList:
 class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
     @report_errors
     def notify(self, args):
-        # pylint: disable=too-many-locals
-
         app = adsk.core.Application.get()
         design = adsk.fusion.Design.cast(app.activeProduct)
 
@@ -283,8 +281,6 @@ class CutlistCommandInputChangedHandler(adsk.core.InputChangedEventHandler):
 class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
     @report_errors
     def notify(self, args):
-        # pylint: disable=too-many-locals
-
         eventArgs = adsk.core.CommandEventArgs.cast(args)
         inputs = eventArgs.command.commandInputs
 
