@@ -2,13 +2,39 @@ import csv
 import html
 import io
 import json
+import re
 import textwrap
 import typing
+
+from dataclasses import dataclass
 
 import adsk.core
 
 from .texttable import Texttable
 from .cutlist import CutList, CutListItem
+
+
+@dataclass
+class FormatOptions:
+    """
+    Options that affect cutlist formatting.
+
+    Options:
+      component_names          use component names instead of body names
+      short_names              only use the final body or component name, rather than the full path
+      remove_numeric_suffixes  remove common numeric suffixes from names
+      unique_names             only output unique names for each item
+      include_material         include material in the output if the format supports it
+      name_separator           the separator to use when joining name elements
+      units                    the units to use for dimensions
+    """
+    component_names: bool = False
+    short_names: bool = False
+    remove_numeric_suffixes: bool = False
+    unique_names: bool = False
+    include_material: bool = True
+    name_separator: str = '/'
+    units: str = 'auto'
 
 
 class FileFilter:
@@ -25,21 +51,45 @@ class Format:
     name = 'Base Format'
     filefilter = FileFilter('Text Files', 'txt')
 
-    def __init__(self, units_manager: adsk.core.UnitsManager, docname: str, units=None):
+    def __init__(self, units_manager: adsk.core.UnitsManager, docname: str, options: FormatOptions):
         self.units_manager = units_manager
         self.docname = docname
-        self.units = units if (units and units != 'auto') else units_manager.defaultLengthUnits
+        self.options = options
+        self.units = options.unique_names if options.units != 'auto' else units_manager.defaultLengthUnits
 
     @property
-    def filename(self):
+    def filename(self) -> str:
         name = self.docname.lower().replace(' ', '_')
         return f'{name}.{self.filefilter.ext}'
 
-    def format_value(self, value, showunits=False):
+    def format_value(self, value, showunits=False) -> str:
         return self.units_manager.formatInternalValue(value, self.units, showunits)
 
-    def format_item_names(self, item: CutListItem):
-        return [p.path_str() for p in item.paths]
+    def format_item_names(self, item: CutListItem) -> list[str]:
+        separator = self.options.name_separator
+
+        names = []
+        for p in item.paths:
+            if self.options.component_names and p.parent_name:
+                if self.options.short_names:
+                    name = p.parent_name
+                else:
+                    name = separator.join(p.components)
+            else:
+                if self.options.short_names:
+                    name = p.body_name
+                else:
+                    name = separator.join((*p.components, p.body_name))
+
+            if self.options.remove_numeric_suffixes:
+                name = re.sub(r'(\s+\d+|\s*\(\d+\))$', '', name)
+
+            names.append(name)
+
+        if self.options.unique_names:
+            names = set(names)
+
+        return sorted(names)
 
     def format(self, cutlist: CutList):
         raise NotImplementedError
@@ -50,6 +100,7 @@ class JSONFormat(Format):
     filefilter = FileFilter('JSON Files', 'json')
 
     def item_to_dict(self, item: CutListItem):
+        include_material = self.options.include_material
         return {
             'count': item.count,
             'dimensions': {
@@ -58,12 +109,28 @@ class JSONFormat(Format):
                 'width': self.format_value(item.dimensions.width),
                 'height': self.format_value(item.dimensions.height),
             },
-            'material': item.material,
+            **({'material': item.material} if include_material else {}),
             'names': self.format_item_names(item),
         }
 
     def format(self, cutlist: CutList):
         return json.dumps([self.item_to_dict(item) for item in cutlist.sorted_items()], indent=2)
+
+
+class CSVDictBuilder:
+    def __init__(self, fields: list[str]):
+        self.fields = fields
+        self.index = 0
+        self.dict = {}
+
+    def set_field(self, value: str):
+        if self.index < len(self.fields):
+            field = self.fields[self.index]
+            self.dict[field] = value
+            self.index += 1
+
+    def build(self) -> dict:
+        return self.dict
 
 
 class CSVFormat(Format):
@@ -74,10 +141,11 @@ class CSVFormat(Format):
 
     @property
     def fieldnames(self):
+        include_material = self.options.include_material
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
         return [
             'count',
-            'material',
+            *(['material'] if include_material else []),
             lengthkey,
             widthkey,
             heightkey,
@@ -85,15 +153,20 @@ class CSVFormat(Format):
         ]
 
     def item_to_dict(self, item: CutListItem):
-        fields = self.fieldnames
-        return {
-            fields[0]: item.count,
-            fields[1]: item.material,
-            fields[2]: self.format_value(item.dimensions.length),
-            fields[3]: self.format_value(item.dimensions.width),
-            fields[4]: self.format_value(item.dimensions.height),
-            fields[5]: ','.join(self.format_item_names(item)),
-        }
+        d = CSVDictBuilder(self.fieldnames)
+
+        d.set_field(item.count)
+
+        if self.options.include_material:
+            d.set_field(item.material)
+
+        d.set_field(self.format_value(item.dimensions.length))
+        d.set_field(self.format_value(item.dimensions.width))
+        d.set_field(self.format_value(item.dimensions.height))
+        d.set_field(','.join(self.format_item_names(item)))
+
+        return d.build()
+
 
     def format(self, cutlist: CutList):
         with io.StringIO(newline='') as f:
@@ -112,20 +185,35 @@ class CutlistOptimizerFormat(CSVFormat):
 
     @property
     def fieldnames(self):
-        return ['Length', 'Width', 'Qty', 'Label', 'Enabled']
+        include_material = self.options.include_material
+        return [
+            'Length',
+            'Width',
+            'Qty',
+            *(['Material'] if include_material else []),
+            'Label',
+            'Enabled',
+        ]
 
     def item_to_dict(self, item: CutListItem):
-        # Note that CutlistOptimizer uses str.split to 'parse' the fields in each record. Import will
-        # fail when fields contain the delimiter. Use semicolon to separate the names and remove all
-        # delimiters from str values.
-        fields = self.fieldnames
-        return {
-            fields[0]: self.format_value(item.dimensions.length),
-            fields[1]: self.format_value(item.dimensions.width),
-            fields[2]: item.count,
-            fields[3]: ';'.join(self.format_item_names(item)).replace(',', ''),
-            fields[4]: 'true'
-        }
+        # CutlistOptimizer uses str.split to 'parse' the fields in each record.
+        # Import will fail when fields contain the delimiter. Use semicolon to
+        # separate the names and remove all delimiters from str values.
+
+        d = CSVDictBuilder(self.fieldnames)
+
+        d.set_field(self.format_value(item.dimensions.length))
+        d.set_field(self.format_value(item.dimensions.width))
+        d.set_field(item.count)
+
+        if self.options.include_material:
+            d.set_field(item.material.replace(',', ''))
+
+        d.set_field(';'.join(n.replace(',', '') for n in self.format_item_names(item)))
+
+        d.set_field('true')
+
+        return d.build()
 
 
 class CutlistEvoFormat(CSVFormat):
@@ -140,20 +228,34 @@ class CutlistEvoFormat(CSVFormat):
 
     @property
     def fieldnames(self):
-        return ['Length', 'Width', 'Thickness', 'Quantity', 'Rotation', 'Name', 'Material', 'Banding']
+        include_material = self.options.include_material
+        return [
+            'Length',
+            'Width',
+            'Thickness',
+            'Quantity',
+            'Rotation',
+            'Name',
+            *(['Material'] if include_material else []),
+            'Banding'
+        ]
 
     def item_to_dict(self, item: CutListItem):
-        fields = self.fieldnames
-        return {
-            fields[0]: self.format_value(item.dimensions.length),
-            fields[1]: self.format_value(item.dimensions.width),
-            fields[2]: self.format_value(item.dimensions.height),
-            fields[3]: item.count,
-            fields[4]: ','.join(['L'] * item.count),
-            fields[5]: ','.join(self.format_item_names(item)),
-            fields[6]: item.material,
-            fields[7]: ','.join(['N'] * item.count),
-        }
+        d = CSVDictBuilder(self.fieldnames)
+
+        d.set_field(self.format_value(item.dimensions.length))
+        d.set_field(self.format_value(item.dimensions.width))
+        d.set_field(self.format_value(item.dimensions.height))
+        d.set_field(item.count)
+        d.set_field(','.join(['L'] * item.count))
+        d.set_field(','.join(self.format_item_names(item)))
+
+        if self.options.include_material:
+            d.set_field(item.material)
+
+        d.set_field(','.join(['N'] * item.count))
+
+        return d.build()
 
 
 class TableFormat(Format):
@@ -161,13 +263,22 @@ class TableFormat(Format):
 
     @property
     def fieldnames(self):
+        include_material = self.options.include_material
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
-        return ['count', 'material', lengthkey, widthkey, heightkey, 'names']
+        return [
+            'count',
+            *(['material'] if include_material else []),
+            lengthkey,
+            widthkey,
+            heightkey,
+            'names',
+        ]
 
     def item_to_row(self, item: CutListItem):
+        include_material = self.options.include_material
         return [
             item.count,
-            item.material,
+            *([item.material] if include_material else []),
             self.format_value(item.dimensions.length),
             self.format_value(item.dimensions.width),
             self.format_value(item.dimensions.height),
@@ -175,11 +286,13 @@ class TableFormat(Format):
         ]
 
     def format(self, cutlist: CutList):
+        include_material = self.options.include_material
+
         tt = Texttable(max_width=0)
         tt.set_deco(Texttable.HEADER | Texttable.HLINES)
         tt.header(self.fieldnames)
-        tt.set_cols_dtype(['i', 't', 't', 't', 't', 't'])
-        tt.set_cols_align(['r', 'l', 'r', 'r', 'r', 'l'])
+        tt.set_cols_dtype(['i', *(['t'] if include_material else []), 't', 't', 't', 't'])
+        tt.set_cols_align(['r', *(['l'] if include_material else []), 'r', 'r', 'r', 'l'])
         tt.add_rows([self.item_to_row(item) for item in cutlist.sorted_items()], header=False)
         return tt.draw()
 
@@ -190,16 +303,25 @@ class HTMLFormat(Format):
 
     @property
     def fieldnames(self):
+        include_material = self.options.include_material
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['Length', 'Width', 'Height']]
-        return ['Count', lengthkey, widthkey, heightkey, 'Material', 'Names']
+        return [
+            'Count',
+            lengthkey,
+            widthkey,
+            heightkey,
+            *(['Material'] if include_material else []),
+            'Names',
+        ]
 
     def item_to_row(self, item: CutListItem):
+        include_material = self.options.include_material
         cols = [
             item.count,
             self.format_value(item.dimensions.length),
             self.format_value(item.dimensions.width),
             self.format_value(item.dimensions.height),
-            html.escape(item.material),
+            *([html.escape(item.material)] if include_material else []),
             '<br>'.join(html.escape(n) for n in self.format_item_names(item)),
         ]
         return '<tr>' + ''.join(f'<td>{c}</td>' for c in cols) + '</tr>'
