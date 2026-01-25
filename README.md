@@ -33,7 +33,8 @@ The wiki also has a [detailed version of these steps with annotated screenshots]
 
 ## Usage
 
-The "Export Cutlist" command is added to the "Make" panel:
+The "Export Cutlist" command is added to the "Make" panel in the "Utilities"
+tab:
 
 ![The Export Cutlist command in the Make panel](./resources/docs/make-panel.png)
 
@@ -41,6 +42,8 @@ After selecting the command, a dialog appears where you can select components
 and bodies and set other options:
 
 ![The Export Cutlist option dialog](./resources/docs/export-cutlist.png)
+
+Hover over any of the options to see a tooltip explaining what it does.
 
 When you are ready to export, click "OK". A file selection dialog will open
 asking where to save the file. Choose a file and click "Save". A message box
