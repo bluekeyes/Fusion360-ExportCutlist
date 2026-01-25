@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from operator import attrgetter
 from typing import NamedTuple
 
+import adsk.core
 import adsk.fusion
 
 from .geometry.bodies import MinimalBody, get_minimal_body
@@ -12,6 +13,22 @@ class GroupBy(NamedTuple):
 
     dimensions: bool
     material: bool
+
+
+class BodyPath(NamedTuple):
+    """The full path to a body from the document's root component."""
+
+    components: tuple[str]
+    body_name: str
+
+    @property
+    def parent_name(self):
+        if len(self.components) > 0:
+            return self.components[-1]
+        return ""
+
+    def path_str(self, separator="/"):
+        return separator.join((*self.components, self.body_name))
 
 
 class Dimensions(NamedTuple):
@@ -68,14 +85,14 @@ class CutListOptions:
 
 
 class CutListItem:
-    def __init__(self, body: MinimalBody, name: str):
-        self.names = [name]
+    def __init__(self, body: MinimalBody, path: BodyPath):
+        self.paths = [path]
         self.dimensions = Dimensions.from_body(body)
         self.material = body.material.name
 
     @property
     def count(self):
-        return len(self.names)
+        return len(self.paths)
 
     def matches(self, other, group_by: GroupBy, tolerance: float):
         if isinstance(other, CutListItem):
@@ -96,8 +113,8 @@ class CutListItem:
 
         return False
 
-    def add_instance(self, name):
-        self.names.append(name)
+    def add_instance(self, path):
+        self.paths.append(path)
 
 
 class CutList:
@@ -110,9 +127,50 @@ class CutList:
         self.group_by = options.group_by
         self.tolerance = options.tolerance
 
-        self.namesep = '/' # TODO(bkeyes): names should only be concatenated on display
+    def add(self, obj: adsk.core.Base, selection: list[adsk.core.Base], ancestors: list[str]=None, selected: bool=False):
+        """
+        Adds the selected bodies reachable from an object to the cutlist.
 
-    def add_body(self, body: adsk.fusion.BRepBody, name: str):
+        The selection set may contain bodies, occurences, or the root component.
+        Selecting an occurence or the root component also selects all bodies
+        that are associated with that entity or any child entity.
+
+        The initial call should include only the root component of the design
+        and the selection set. The remaining parameters are used as part of
+        recursive calls when decending through the design tree.
+        """
+        if ancestors is None:
+            ancestors = []
+
+        if isinstance(obj, adsk.fusion.BRepBody):
+            if selected or obj in selection:
+                self.add_body(obj, BodyPath(tuple(ancestors), obj.name))
+
+        elif isinstance(obj, adsk.fusion.Occurrence):
+            if obj.isReferencedComponent and self.ignore_external:
+                return
+
+            selected = selected or obj in selection
+            ancestors = [*ancestors, obj.component.name]
+
+            for child in [*obj.bRepBodies, *obj.childOccurrences]:
+                self.add(child, selection, ancestors, selected)
+
+        elif isinstance(obj, adsk.fusion.Component):
+            # The only component that should appear here is the root component.
+            # Exclude it from the ancestor list because it has the same name as
+            # the document and is not useful to include in the cutlist output.
+            selected = selected or obj in selection
+            for child in [*obj.bRepBodies, *obj.occurrences]:
+                self.add(child, selection, ancestors, selected)
+
+        else:
+            raise ValueError(f'Cannot add object with type: {obj.objectType}')
+
+    def add_body(self, body: adsk.fusion.BRepBody, path: BodyPath):
+        """
+        Adds a body to the cutlist, matching it against existing items.
+        """
         if not body.isSolid:
             return
 
@@ -127,37 +185,14 @@ class CutList:
         added = False
         for item in self.items:
             if item.matches(minimal_body, self.group_by, self.tolerance):
-                item.add_instance(name)
+                item.add_instance(path)
                 added = True
                 break
 
         if not added:
-            item = CutListItem(minimal_body, name)
+            item = CutListItem(minimal_body, path)
             self.items.append(item)
 
-    def add(self, obj, name=None):
-        # Body selected directly
-        if isinstance(obj, adsk.fusion.BRepBody):
-            self.add_body(obj, self._joinname(name, obj.name))
-
-        # Non-root component selected directly or as a child of another occurence
-        elif isinstance(obj, adsk.fusion.Occurrence):
-            if obj.isReferencedComponent and self.ignore_external:
-                return
-            for body in obj.bRepBodies:
-                self.add_body(body, self._joinname(name, obj.component.name, body.name))
-            for child in obj.childOccurrences:
-                self.add(child, self._joinname(name, obj.component.name))
-
-        # Root component selected directly
-        elif isinstance(obj, adsk.fusion.Component):
-            for body in obj.bRepBodies:
-                self.add_body(body, self._joinname(name, obj.name, body.name))
-            for occ in obj.occurrences:
-                self.add(occ, self._joinname(name, obj.name))
-
-        else:
-            raise ValueError(f'Cannot add object with type: {obj.objectType}')
 
     def sorted_items(self):
         items = list(self.items)
@@ -165,6 +200,3 @@ class CutList:
         items.sort(key=attrgetter('count'), reverse=True)
         items.sort(key=attrgetter('material'))
         return items
-
-    def _joinname(self, *parts):
-        return self.namesep.join([p for p in parts if p])
