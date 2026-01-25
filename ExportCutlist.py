@@ -89,19 +89,44 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         external_input = inputs.addBoolValueInput('external', 'Ignore external', True, '', user_options.cutlist_options.ignore_external)
         external_input.tooltip = 'If checked, external components are excluded from the cutlist.'
 
-        format_input = inputs.addDropDownCommandInput('format', 'Output format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+
+        format_group = inputs.addGroupCommandInput('format_group', 'Format')
+        format_group.isEnabledCheckBoxDisplayed = False
+        format_group.isExpanded = True
+
+        format_input = format_group.children.addDropDownCommandInput('format', 'Output format', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         format_input.tooltip = 'The output format of the cutlist.'
         for fmt in ALL_FORMATS:
             format_input.listItems.add(fmt.name, user_options.format == fmt.name, '')
 
-        grouping_group = inputs.addGroupCommandInput('grouping', 'Group By')
-        grouping_group.isEnabledCheckBoxDisplayed = False
-        grouping_group.isExpanded = True
+        short_names_input = format_group.children.addBoolValueInput('short_names', 'Use short names', True, '', user_options.format_options.short_names)
+        short_names_input.tooltip = 'If checked, do not include the parents of a body or component in its name.'
 
-        dimensions_input = grouping_group.children.addBoolValueInput('group_dimensions', 'Dimensions', True, '', user_options.cutlist_options.group_by.dimensions)
+        component_names_input = format_group.children.addBoolValueInput('component_names', 'Use component names', True, '', user_options.format_options.component_names)
+        component_names_input.tooltip = 'If checked, use component names instead of body names.'
+
+        unique_names_input = format_group.children.addBoolValueInput('unique_names', 'Only output unique names', True, '', user_options.format_options.unique_names)
+        unique_names_input.tooltip = 'If checked, only include the unique names associated with each cutlist item.'
+
+        remove_numeric_input = format_group.children.addBoolValueInput('remove_numeric', 'Remove numeric suffixes', True, '', user_options.format_options.remove_numeric_suffixes)
+        remove_numeric_input.tooltip = 'If checked, remove common numeric suffixes from names.'
+
+        include_material_input = format_group.children.addBoolValueInput('include_material', 'Include material details', True, '', user_options.format_options.include_material)
+        include_material_input.tooltip = 'If checked, include material details in the output'
+        
+        unit_input = format_group.children.addDropDownCommandInput('unit', 'Output units', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
+        unit_input.tooltip = 'Units for output dimensions'
+        for units in ALL_UNITS:
+            unit_input.listItems.add(units, user_options.format_options.units == units, '')
+
+        group_by_group = inputs.addGroupCommandInput('group_by_group', 'Group By')
+        group_by_group.isEnabledCheckBoxDisplayed = False
+        group_by_group.isExpanded = True
+
+        dimensions_input = group_by_group.children.addBoolValueInput('group_dimensions', 'Dimensions', True, '', user_options.cutlist_options.group_by.dimensions)
         dimensions_input.tooltip = 'If checked, group bodies by their dimensions.'
 
-        material_input = grouping_group.children.addBoolValueInput('group_material', 'Material', True, '', user_options.cutlist_options.group_by.material)
+        material_input = group_by_group.children.addBoolValueInput('group_material', 'Material', True, '', user_options.cutlist_options.group_by.material)
         material_input.tooltip = 'If checked, group bodies by their material.'
         material_input.tooltipDescription = 'This option is only used when also grouping bodies by their dimensions.'
         material_input.isEnabled = dimensions_input.value
@@ -109,11 +134,6 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         advanced_group = inputs.addGroupCommandInput('advanced', 'Advanced Options')
         advanced_group.isEnabledCheckBoxDisplayed = False
         advanced_group.isExpanded = False
-
-        unit_input = advanced_group.children.addDropDownCommandInput('unit', 'Output unit', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
-        unit_input.tooltip = 'Units for output dimensions'
-        for units in ALL_UNITS:
-            unit_input.listItems.add(units, user_options.format_options.units == units, '')
 
         axis_aligned_input = advanced_group.children.addBoolValueInput('axisaligned', 'Use axis-aligned boxes', True, '', user_options.cutlist_options.axis_aligned)
         axis_aligned_input.tooltip = 'If checked, use axis-algined bounding boxes.'
@@ -184,21 +204,34 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 def set_options_from_inputs(inputs: adsk.core.CommandInputs):
     hidden_input: adsk.core.BoolValueCommandInput = inputs.itemById('hidden')
     external_input: adsk.core.BoolValueCommandInput = inputs.itemById('external')
+
     format_input: adsk.core.DropDownCommandInput = inputs.itemById('format')
-    axis_aligned_input: adsk.core.BoolValueCommandInput = inputs.itemById('axisaligned')
-    tolerance_input: adsk.core.ValueCommandInput = inputs.itemById('tolerance')
+    short_names_input: adsk.core.BoolValueCommandInput = inputs.itemById('short_names')
+    component_names_input: adsk.core.BoolValueCommandInput = inputs.itemById('component_names')
+    unique_names_input: adsk.core.BoolValueCommandInput = inputs.itemById('unique_names')
+    remove_numeric_input: adsk.core.BoolValueCommandInput = inputs.itemById('remove_numeric')
+    include_material_input: adsk.core.BoolValueCommandInput = inputs.itemById('include_material')
     unit_input: adsk.core.DropDownCommandInput = inputs.itemById('unit')
 
     dimensions_input: adsk.core.BoolValueCommandInput = inputs.itemById('group_dimensions')
     material_input: adsk.core.BoolValueCommandInput = inputs.itemById('group_material')
     group_by = GroupBy(dimensions=dimensions_input.value, material=material_input.value)
 
+    axis_aligned_input: adsk.core.BoolValueCommandInput = inputs.itemById('axisaligned')
+    tolerance_input: adsk.core.ValueCommandInput = inputs.itemById('tolerance')
+
     user_options.cutlist_options.ignore_hidden = hidden_input.value
     user_options.cutlist_options.ignore_external = external_input.value
     user_options.cutlist_options.group_by = group_by
     user_options.cutlist_options.axis_aligned = axis_aligned_input.value
     user_options.cutlist_options.tolerance = tolerance_input.value
+
     user_options.format = format_input.selectedItem.name
+    user_options.format_options.short_names = short_names_input.value
+    user_options.format_options.component_names = component_names_input.value
+    user_options.format_options.unique_names = unique_names_input.value
+    user_options.format_options.remove_numeric_suffixes = remove_numeric_input.value
+    user_options.format_options.include_material = include_material_input.value
     user_options.format_options.units = unit_input.selectedItem.name
 
 
