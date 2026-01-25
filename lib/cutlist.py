@@ -25,10 +25,7 @@ class BodyPath(NamedTuple):
     def parent_name(self):
         if len(self.components) > 0:
             return self.components[-1]
-        return ""
-
-    def path_str(self, separator="/"):
-        return separator.join((*self.components, self.body_name))
+        return None
 
 
 class Dimensions(NamedTuple):
