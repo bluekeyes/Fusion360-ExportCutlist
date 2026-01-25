@@ -113,7 +113,7 @@ class CutlistCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
 
         include_material_input = format_group.children.addBoolValueInput('include_material', 'Include material details', True, '', user_options.format_options.include_material)
         include_material_input.tooltip = 'If checked, include material details in the output'
-        
+
         unit_input = format_group.children.addDropDownCommandInput('unit', 'Output units', adsk.core.DropDownStyles.LabeledIconDropDownStyle)
         unit_input.tooltip = 'Units for output dimensions'
         for units in ALL_UNITS:
