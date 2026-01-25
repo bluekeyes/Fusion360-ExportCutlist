@@ -2,7 +2,7 @@
 
 # Fusion360 Export Cutlist 
 
-An Autodesk Fusion360 addin that can export a cut list of parts in a variety
+An Autodesk Fusion 360 addin that can export a cut list of parts in a variety
 of formats. Useful for woodworking or other crafts that mostly cut shapes out of
 rectangular stock.
 
@@ -21,13 +21,12 @@ document structure or workflow.
 
 ## Installation
 
-1. Download the [latest release](https://github.com/bluekeyes/Fusion360-ExportCutlist/archive/v0.5.3.zip)
+1. Download the [latest release](https://github.com/bluekeyes/Fusion360-ExportCutlist/archive/v0.6.0.zip)
 2. Unzip the file on your computer
-3. Start Fusion360 and open the "Scripts & Addins" dialog (Shift+S)
-4. Go to the "Add-Ins" tab
-5. Click the green "+" (plus) sign next to "My Add-Ins"
-6. Selected the extracted folder from Step 2
-7. Click the "Run" button (or restart Fusion 360) to start the add-in
+3. Start Fusion and open the "Scripts & Addins" dialog (Shift+S)
+4. Click the "+" (plus) sign and select "Script or add-in from device"
+5. Selected the extracted folder from Step 2
+6. Click the "Run" toggle (or restart Fusion) to start the add-in
 
 The wiki also has a [detailed version of these steps with annotated screenshots](https://github.com/bluekeyes/Fusion360-ExportCutlist/wiki/Installation).
 
