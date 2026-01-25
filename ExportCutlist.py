@@ -156,11 +156,13 @@ class CutlistCommandExecuteHandler(adsk.core.CommandEventHandler):
 
         set_options_from_inputs(inputs)
 
-        cutlist = CutList(user_options.cutlist)
-
+        selection = []
         selection_input = inputs.itemById('selection')
         for i in range(selection_input.selectionCount):
-            cutlist.add(selection_input.selection(i).entity)
+            selection.append(selection_input.selection(i).entity)
+
+        cutlist = CutList(user_options.cutlist)
+        cutlist.add(design.rootComponent, selection)
 
         fmt_class = get_format(user_options.format)
         fmt = fmt_class(design.unitsManager, doc.name, units=user_options.unit)

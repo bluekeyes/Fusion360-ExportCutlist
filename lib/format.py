@@ -8,6 +8,7 @@ import typing
 import adsk.core
 
 from .texttable import Texttable
+from .cutlist import CutList, CutListItem
 
 
 class FileFilter:
@@ -37,7 +38,10 @@ class Format:
     def format_value(self, value, showunits=False):
         return self.units_manager.formatInternalValue(value, self.units, showunits)
 
-    def format(self, cutlist):
+    def format_item_names(self, item: CutListItem):
+        return [p.path_str() for p in item.paths]
+
+    def format(self, cutlist: CutList):
         raise NotImplementedError
 
 
@@ -45,7 +49,7 @@ class JSONFormat(Format):
     name = 'JSON'
     filefilter = FileFilter('JSON Files', 'json')
 
-    def item_to_dict(self, item):
+    def item_to_dict(self, item: CutListItem):
         return {
             'count': item.count,
             'dimensions': {
@@ -55,10 +59,10 @@ class JSONFormat(Format):
                 'height': self.format_value(item.dimensions.height),
             },
             'material': item.material,
-            'names': item.names,
+            'names': self.format_item_names(item),
         }
 
-    def format(self, cutlist):
+    def format(self, cutlist: CutList):
         return json.dumps([self.item_to_dict(item) for item in cutlist.sorted_items()], indent=2)
 
 
@@ -80,7 +84,7 @@ class CSVFormat(Format):
             'names'
         ]
 
-    def item_to_dict(self, item):
+    def item_to_dict(self, item: CutListItem):
         fields = self.fieldnames
         return {
             fields[0]: item.count,
@@ -88,10 +92,10 @@ class CSVFormat(Format):
             fields[2]: self.format_value(item.dimensions.length),
             fields[3]: self.format_value(item.dimensions.width),
             fields[4]: self.format_value(item.dimensions.height),
-            fields[5]: ','.join(item.names),
+            fields[5]: ','.join(self.format_item_names(item)),
         }
 
-    def format(self, cutlist):
+    def format(self, cutlist: CutList):
         with io.StringIO(newline='') as f:
             w = csv.DictWriter(f, dialect=self.dialect, fieldnames=self.fieldnames)
             w.writeheader()
@@ -110,7 +114,7 @@ class CutlistOptimizerFormat(CSVFormat):
     def fieldnames(self):
         return ['Length', 'Width', 'Qty', 'Label', 'Enabled']
 
-    def item_to_dict(self, item):
+    def item_to_dict(self, item: CutListItem):
         # Note that CutlistOptimizer uses str.split to 'parse' the fields in each record. Import will
         # fail when fields contain the delimiter. Use semicolon to separate the names and remove all
         # delimiters from str values.
@@ -119,7 +123,7 @@ class CutlistOptimizerFormat(CSVFormat):
             fields[0]: self.format_value(item.dimensions.length),
             fields[1]: self.format_value(item.dimensions.width),
             fields[2]: item.count,
-            fields[3]: ';'.join(item.names).replace(',', ''),
+            fields[3]: ';'.join(self.format_item_names(item)).replace(',', ''),
             fields[4]: 'true'
         }
 
@@ -138,7 +142,7 @@ class CutlistEvoFormat(CSVFormat):
     def fieldnames(self):
         return ['Length', 'Width', 'Thickness', 'Quantity', 'Rotation', 'Name', 'Material', 'Banding']
 
-    def item_to_dict(self, item):
+    def item_to_dict(self, item: CutListItem):
         fields = self.fieldnames
         return {
             fields[0]: self.format_value(item.dimensions.length),
@@ -146,7 +150,7 @@ class CutlistEvoFormat(CSVFormat):
             fields[2]: self.format_value(item.dimensions.height),
             fields[3]: item.count,
             fields[4]: ','.join(['L'] * item.count),
-            fields[5]: ','.join(item.names),
+            fields[5]: ','.join(self.format_item_names(item)),
             fields[6]: item.material,
             fields[7]: ','.join(['N'] * item.count),
         }
@@ -160,17 +164,17 @@ class TableFormat(Format):
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['length', 'width', 'height']]
         return ['count', 'material', lengthkey, widthkey, heightkey, 'names']
 
-    def item_to_row(self, item):
+    def item_to_row(self, item: CutListItem):
         return [
             item.count,
             item.material,
             self.format_value(item.dimensions.length),
             self.format_value(item.dimensions.width),
             self.format_value(item.dimensions.height),
-            '\n'.join(item.names),
+            '\n'.join(self.format_item_names(item)),
         ]
 
-    def format(self, cutlist):
+    def format(self, cutlist: CutList):
         tt = Texttable(max_width=0)
         tt.set_deco(Texttable.HEADER | Texttable.HLINES)
         tt.header(self.fieldnames)
@@ -189,18 +193,18 @@ class HTMLFormat(Format):
         lengthkey, widthkey, heightkey = [f'{v} ({self.units})' for v in ['Length', 'Width', 'Height']]
         return ['Count', lengthkey, widthkey, heightkey, 'Material', 'Names']
 
-    def item_to_row(self, item):
+    def item_to_row(self, item: CutListItem):
         cols = [
             item.count,
             self.format_value(item.dimensions.length),
             self.format_value(item.dimensions.width),
             self.format_value(item.dimensions.height),
             html.escape(item.material),
-            '<br>'.join(html.escape(n) for n in item.names),
+            '<br>'.join(html.escape(n) for n in self.format_item_names(item)),
         ]
         return '<tr>' + ''.join(f'<td>{c}</td>' for c in cols) + '</tr>'
 
-    def format(self, cutlist):
+    def format(self, cutlist: CutList):
         title = html.escape(self.docname)
         header = ''.join(f'<th>{html.escape(h)}</th>' for h in self.fieldnames)
         rows = ''.join(self.item_to_row(item) for item in cutlist.sorted_items())
