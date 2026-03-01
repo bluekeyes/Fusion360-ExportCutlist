@@ -55,7 +55,7 @@ class Format:
         self.units_manager = units_manager
         self.docname = docname
         self.options = options
-        self.units = options.unique_names if options.units != 'auto' else units_manager.defaultLengthUnits
+        self.units = options.units if options.units != 'auto' else units_manager.defaultLengthUnits
 
     @property
     def filename(self) -> str:
