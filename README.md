@@ -21,7 +21,7 @@ document structure or workflow.
 
 ## Installation
 
-1. Download the [latest release](https://github.com/bluekeyes/Fusion360-ExportCutlist/archive/v0.6.0.zip)
+1. Download the [latest release](https://github.com/bluekeyes/Fusion360-ExportCutlist/archive/v0.6.1.zip)
 2. Unzip the file on your computer
 3. Start Fusion and open the "Scripts & Addins" dialog (Shift+S)
 4. Click the "+" (plus) sign and select "Script or add-in from device"
